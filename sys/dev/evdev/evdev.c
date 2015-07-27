@@ -55,6 +55,7 @@ MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 static inline void set_bit(unsigned long *, int);
 static inline void clr_bit(unsigned long *, int);
 static inline void change_bit(unsigned long *, int, int);
+static inline int get_bit(unsigned long *, int);
 static void evdev_assign_id(struct evdev_dev *);
 #if 0
 static void evdev_start_repeat(struct evdev_dev *, int32_t);
@@ -83,6 +84,12 @@ change_bit(unsigned long *array, int bit, int value)
 		set_bit(array, bit);
 	else
 		clr_bit(array, bit);
+}
+
+static inline int
+get_bit(unsigned long *array, int bit)
+{
+	return ((array[bit / LONG_WIDTH] & (1LL << (bit % LONG_WIDTH))) > 0);
 }
 
 struct evdev_dev *
@@ -351,8 +358,16 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	    evdev->ev_shortname, type, code, value);
 
 	/* For certain event types, update device state bits */
-	if (type == EV_KEY)
-		change_bit(evdev->ev_key_states, code, value);
+	if (type == EV_KEY) {
+		/* Detect key repeats. */
+		if (get_bit(evdev->ev_key_states, code) &&
+		    value != KEY_EVENT_UP) {
+			if (evdev->ev_repeat_mode != DRIVER_REPEAT)
+				return (0);
+			value = KEY_EVENT_REPEAT;
+		} else
+			change_bit(evdev->ev_key_states, code, value);
+	}
 
 	if (type == EV_LED)
 		change_bit(evdev->ev_led_states, code, value);

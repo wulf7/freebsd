@@ -57,6 +57,13 @@ enum evdev_repeat_mode
 	EVDEV_REPEAT
 };
 
+enum evdev_key_events
+{
+	KEY_EVENT_UP,
+	KEY_EVENT_DOWN,
+	KEY_EVENT_REPEAT
+};
+
 struct evdev_methods
 {
 	evdev_open_t		*ev_open;
