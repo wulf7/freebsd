@@ -135,7 +135,7 @@ struct input_keymap_entry {
  *
  * If the request code is not an ABS_MT value, -EINVAL is returned.
  */
-#define EVIOCGMTSLOTS(len)	_IOC(IOC_OUT, 'E', 0x0a, len)
+#define EVIOCGMTSLOTS(len)	_IOC(IOC_INOUT, 'E', 0x0a, len)
 
 #define EVIOCGKEY(len)		_IOC(IOC_OUT, 'E', 0x18, len)		/* get global key state */
 #define EVIOCGLED(len)		_IOC(IOC_OUT, 'E', 0x19, len)		/* get all LEDs */

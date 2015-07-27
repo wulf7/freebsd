@@ -316,6 +316,8 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	struct input_keymap_entry *ke;
 	int rep_params[2];
 	int ret, len, num, limit;
+	uint32_t code;
+	size_t nvalues;
 
 	ret = devfs_get_cdevpriv((void **)&state);
 	if (ret != 0)
@@ -424,6 +426,19 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	case EVIOCGPROP(0):
 		limit = MIN(len, howmany(EV_CNT, 8));
 		memcpy(data, evdev->ev_type_flags, limit);
+		break;
+
+	case EVIOCGMTSLOTS(0):
+		if (len < sizeof(uint32_t))
+			return (EINVAL);
+		code = *(uint32_t *)data;
+		if (!ABS_IS_MT(code))
+			return (EINVAL);
+
+		nvalues = MIN(len / sizeof(int32_t) - 1, MAX_MT_SLOTS);
+		for (int i = 0; i < nvalues; i++)
+			((int32_t *)data)[i + 1] =
+			    evdev->ev_mt_states[i][ABS_MT_INDEX(code)];
 		break;
 
 	case EVIOCGKEY(0):

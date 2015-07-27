@@ -109,7 +109,7 @@ evdev_free(struct evdev_dev *evdev)
 int
 evdev_register(device_t dev, struct evdev_dev *evdev)
 {
-	int ret;
+	int ret, i;
 
 	device_printf(dev, "registered evdev provider: %s <%s>\n",
 	    evdev->ev_name, evdev->ev_serial);
@@ -136,6 +136,11 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 
 	/* Retrieve bus info */
 	evdev_assign_id(evdev);
+
+	/* Initialize multitouch protocol type B states */
+	evdev->current_mt_slot = -1;
+	for (i = 0; i < MAX_MT_SLOTS; i++)
+		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 
 	/* Create char device node */
 	ret = evdev_cdev_create(evdev);
@@ -327,6 +332,8 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	} else if (type == EV_ABS) {
 		if (code >= ABS_CNT)
 			return (EINVAL);
+		if (code == ABS_MT_SLOT && value >= MAX_MT_SLOTS)
+			return (EINVAL);
 	} else if (type == EV_MSC) {
 		if (code >= MSC_CNT)
 			return (EINVAL);
@@ -379,8 +386,31 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		change_bit(evdev->ev_sw_states, code, value);
 
 	/* For EV_ABS, save last value in absinfo */
-	if (type == EV_ABS)
+	if (type == EV_ABS) {
 		evdev->ev_absinfo[code].value = value;
+		/* Don`t repeat MT protocol type B events */
+		if (code == ABS_MT_SLOT) {
+			if (evdev->current_mt_slot == value)
+				return (0);
+			evdev->current_mt_slot = value;
+		} else if (ABS_IS_MT(code)) {
+			if (evdev->ev_mt_states[evdev->current_mt_slot]
+			    [ABS_MT_INDEX(code)] == value)
+				return (0);
+			else
+				evdev->ev_mt_states[evdev->current_mt_slot]
+				    [ABS_MT_INDEX(code)] = value;
+		}
+	}
+
+	/* Skip empty reports */
+	if (type == EV_SYN) {
+		if (evdev->events_since_last_syn == 0)
+			return (0);
+		evdev->events_since_last_syn = 0;
+	} else {
+		evdev->events_since_last_syn++;
+	}
 
 	/* Propagate event through all clients */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {

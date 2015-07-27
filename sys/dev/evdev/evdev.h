@@ -50,6 +50,14 @@ typedef void (evdev_keycode_t)(struct evdev_dev *, void *,
     struct input_keymap_entry *);
 typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 
+/* Multitouch protocol type B interface */
+#define	MAX_MT_SLOTS	16
+#define	ABS_MT_FIRST	ABS_MT_TOUCH_MAJOR
+#define	ABS_MT_LAST	ABS_MT_TOOL_Y
+#define	ABS_IS_MT(x)	((x) >= ABS_MT_FIRST && (x) <= ABS_MT_LAST)
+#define	ABS_MT_INDEX(x)	((x) - ABS_MT_FIRST)
+#define	MT_CNT		(ABS_MT_INDEX(ABS_MT_LAST) + 1)
+
 enum evdev_repeat_mode
 {
 	NO_REPEAT,
@@ -107,6 +115,11 @@ struct evdev_dev
 	unsigned long		ev_led_states[nlongs(LED_CNT)];
 	unsigned long		ev_snd_states[nlongs(SND_CNT)];
 	unsigned long		ev_sw_states[nlongs(SW_CNT)];
+
+	/* Multitouch protocol type B state: */
+	int32_t			current_mt_slot;
+	int32_t			ev_mt_states[MAX_MT_SLOTS][MT_CNT];
+	int			events_since_last_syn;
 
 	/* Counters: */
 	uint64_t		ev_event_count;
