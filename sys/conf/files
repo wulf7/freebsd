@@ -594,6 +594,8 @@ dev/aacraid/aacraid_debug.c	optional aacraid
 dev/aacraid/aacraid_linux.c	optional aacraid compat_linux
 dev/aacraid/aacraid_pci.c	optional aacraid pci
 dev/acpi_support/acpi_wmi.c	optional acpi_wmi acpi
+dev/acpi_support/acpi_acer_amw0.c	optional acpi_acer_amw0 acpi
+dev/acpi_support/acpi_acer_wmid.c	optional acpi_acer_wmid acpi
 dev/acpi_support/acpi_asus.c	optional acpi_asus acpi
 dev/acpi_support/acpi_asus_wmi.c	optional acpi_asus_wmi acpi
 dev/acpi_support/acpi_fujitsu.c	optional acpi_fujitsu acpi
