@@ -149,7 +149,7 @@ struct input_keymap_entry {
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
 #define EVIOCGEFFECTS		_IOR('E', 0x84, int)			/* Report number of effects playable at the same time */
 
-#define EVIOCGRAB		_IOW('E', 0x90, int)			/* Grab/Release device */
+#define EVIOCGRAB		_IOWINT('E', 0x90)			/* Grab/Release device */
 #define EVIOCREVOKE		_IOWINT('E', 0x91)			/* Revoke device access */
 
 #define EVIOCSCLOCKID		_IOW('E', 0xa0, int)			/* Set clockid to be used for timestamps */

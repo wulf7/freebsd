@@ -455,11 +455,11 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		break;
 
 	case IOCBASECMD(EVIOCGRAB):
-		if (data)
-			evdev_grab_client(state->ecs_client);
+		if (*(int *)data)
+			return (evdev_grab_client(state->ecs_client));
 		else
-			evdev_release_client(state->ecs_client);
-		break;
+			return (evdev_release_client(state->ecs_client));
+		/* NOTREACHED */
 
 	case IOCBASECMD(EVIOCREVOKE):
 		if (*(int *)data != 0)
