@@ -308,7 +308,10 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 
-	if (type == EV_KEY) {
+	if (type == EV_SYN) {
+		if (code >= SYN_CNT)
+			return (EINVAL);
+	} else if (type == EV_KEY) {
 		if (code >= KEY_CNT)
 			return (EINVAL);
 	} else if (type == EV_REL) {
