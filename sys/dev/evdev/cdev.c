@@ -103,8 +103,6 @@ struct evdev_cdev_state
 	bool			ecs_revoked;
 };
 
-static int evdev_cdev_count = 0;
-
 static int
 evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
@@ -576,11 +574,18 @@ evdev_cdev_create(struct evdev_dev *evdev)
 {
 	struct evdev_cdev_softc *sc;
 	struct cdev *cdev;
+	int ret, unit = 0;
 
-	snprintf(evdev->ev_cdev_name, NAMELEN, "input/event%d",
-	    evdev_cdev_count++);
-	cdev = make_dev(&evdev_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600,
-	    "%s", evdev->ev_cdev_name);
+	/* Try to coexist with cuse-backed input/event devices */
+	do {
+		snprintf(evdev->ev_cdev_name, NAMELEN, "input/event%d",
+		    unit++);
+		ret = make_dev_p(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
+		    &cdev, &evdev_cdevsw, NULL, UID_ROOT, GID_WHEEL, 0600,
+		    "%s", evdev->ev_cdev_name);
+	} while (ret == EEXIST);
+	if (ret != 0)
+		return (ret);
 
 	sc = malloc(sizeof(struct evdev_cdev_softc), M_EVDEV,
 	    M_WAITOK | M_ZERO);
@@ -596,6 +601,5 @@ evdev_cdev_destroy(struct evdev_dev *evdev)
 {
 
 	destroy_dev(evdev->ev_cdev);
-	evdev_cdev_count--;
 	return (0);
 }
