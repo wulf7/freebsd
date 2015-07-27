@@ -123,7 +123,8 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	state->ecs_client->ec_ev_notify = &evdev_notify_event;
 	state->ecs_client->ec_ev_arg = state;
 
-	knlist_init_mtx(&state->ecs_selp.si_note, NULL);
+	knlist_init_mtx(&state->ecs_selp.si_note,
+	    &state->ecs_client->ec_buffer_mtx);
 
 	sc->ecs_open_count++;
 	devfs_set_cdevpriv(state, evdev_dtor);
@@ -144,7 +145,9 @@ evdev_dtor(void *data)
 {
 	struct evdev_cdev_state *state = (struct evdev_cdev_state *)data;
 
+	knlist_clear(&state->ecs_selp.si_note, 0);
 	seldrain(&state->ecs_selp);
+	knlist_destroy(&state->ecs_selp.si_note);
 	funsetown(&state->ecs_sigio);
 	evdev_dispose_client(state->ecs_client);
 	free(data, M_EVDEV);
@@ -279,8 +282,14 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	if (ret != 0)
 		return (ret);
 
+	switch(kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &evdev_cdev_filterops;
+		break;
+	default:
+		return(EINVAL);
+	}
 	kn->kn_hook = (caddr_t)state;
-	kn->kn_fop = &evdev_cdev_filterops;
 
 	knlist_add(&state->ecs_selp.si_note, kn, 0);
 	return (0);
@@ -591,6 +600,7 @@ evdev_notify_event(struct evdev_client *client, void *data)
 		state->ecs_selected = false;
 		selwakeup(&state->ecs_selp);
 	}
+	KNOTE_LOCKED(&state->ecs_selp.si_note, 0);
 
 	if (state->ecs_async && state->ecs_sigio != NULL)
 		pgsigio(&state->ecs_sigio, SIGIO, 0);
