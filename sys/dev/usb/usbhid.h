@@ -134,6 +134,12 @@ struct usb_hid_descriptor {
 
 /* Usages Digitizers */
 #define	HUD_UNDEFINED		0x0000
+#define	HUD_EXTERNAL_PEN	0x0001
+#define	HUD_INTEGRATED_PEN	0x0002
+#define	HUD_TOUCHSCREEN		0x0004
+#define	HUD_TOUCHPAD		0x0005
+#define	HUD_STYLUS		0x0020
+#define	HUD_FINGER		0x0022
 #define	HUD_TIP_PRESSURE	0x0030
 #define	HUD_BARREL_PRESSURE	0x0031
 #define	HUD_IN_RANGE		0x0032
@@ -157,6 +163,15 @@ struct usb_hid_descriptor {
 #define	HUD_BARREL_SWITCH	0x0044
 #define	HUD_ERASER		0x0045
 #define	HUD_TABLET_PICK		0x0046
+
+/* Usages Digitizers Microsoft Windows 7 */
+#define	HUD_CONFIDENCE		0x0047
+#define	HUD_WIDTH		0x0048
+#define	HUD_HEIGHT		0x0049
+#define	HUD_CONTACT_IDENTIFIER	0x0051
+#define	HUD_CONTACT_COUNT	0x0054
+#define	HUD_CONTACT_COUNT_MAX	0x0055
+#define	HUD_SCAN_TIME		0x0056
 
 /* Usages, Consumer */
 #define	HUC_AC_PAN		0x0238
