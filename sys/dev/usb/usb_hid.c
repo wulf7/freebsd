@@ -91,8 +91,8 @@ struct hid_data {
 	uint32_t loc_count;	/* last seen count */
 	uint8_t	kindset;	/* we have 5 kinds so 8 bits are enough */
 	uint8_t	pushlevel;	/* current pushlevel */
-	uint8_t	ncount;		/* end usage item count */
-	uint8_t icount;		/* current usage item count */
+	uint16_t ncount;	/* end usage item count */
+	uint16_t icount;	/* current usage item count */
 	uint8_t	nusage;		/* end "usages_min/max" index */
 	uint8_t	iusage;		/* current "usages_min/max" index */
 	uint8_t ousage;		/* current "usages_min/max" offset */
@@ -261,7 +261,8 @@ hid_get_item(struct hid_data *s, struct hid_item *h)
 			c->usage = dval;
 			s->usage_last = dval;
 			if (dval == s->usages_max[s->iusage]) {
-				s->iusage ++;
+				if (s->iusage < MAXUSAGE - 1)
+					s->iusage ++;
 				s->ousage = 0;
 			} else {
 				s->ousage ++;
@@ -352,11 +353,11 @@ hid_get_item(struct hid_data *s, struct hid_item *h)
 
 				if (c->flags & HIO_VARIABLE) {
 					/* range check usage count */
-					if (c->loc.count > 255) {
+					if (c->loc.count > 256) {
 						DPRINTFN(0, "Number of "
-						    "items(%u) truncated to 255\n",
+						    "items(%u) truncated to 256\n",
 						    (unsigned)(c->loc.count));
-						s->ncount = 255;
+						s->ncount = 256;
 					} else
 						s->ncount = c->loc.count;
 
