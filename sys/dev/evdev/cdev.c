@@ -101,6 +101,7 @@ struct evdev_cdev_state
 	struct sigio *		ecs_sigio;
 	bool			ecs_async;
 	bool			ecs_revoked;
+	bool			ecs_blocked;
 };
 
 static int
@@ -184,6 +185,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 			return (EWOULDBLOCK);
 		}
 
+		state->ecs_blocked = true;
 		mtx_sleep(client, &client->ec_buffer_mtx, PCATCH, "evrea", 0);
 	}
 
@@ -578,7 +580,10 @@ evdev_notify_event(struct evdev_client *client, void *data)
 {
 	struct evdev_cdev_state *state = (struct evdev_cdev_state *)data;
 
-	wakeup(client);
+	if (state->ecs_blocked) {
+		state->ecs_blocked = false;
+		wakeup(client);
+	}
 	selwakeup(&state->ecs_selp);
 
 	if (state->ecs_async && state->ecs_sigio != NULL)
