@@ -418,6 +418,9 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 	/* Propagate event through all clients */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+		if (!client->ec_enabled)
+			continue;
+	
 		/* report postponed ABS_MT_SLOT */
 		if (evdev->postponed_mt_slot != -1)
 			evdev_client_push(client,
@@ -629,11 +632,6 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 	tail = client->ec_buffer_tail;
 	count = client->ec_buffer_size;
 
-	if (!client->ec_enabled) {
-		EVDEV_CLIENT_UNLOCKQ(client);
-		return;
-	}
-	
 	/* If queue is full, overwrite last element with SYN_DROPPED event */
 	if ((tail + 1) % count == head) {
 		debugf("client %p for device %s: buffer overflow", client,
