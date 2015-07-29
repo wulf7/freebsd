@@ -118,6 +118,8 @@ struct evdev_dev
 
 	/* Multitouch protocol type B state: */
 	int32_t			current_mt_slot;
+	int32_t			last_reported_mt_slot;
+	int32_t			postponed_mt_slot;
 	int32_t			ev_mt_states[MAX_MT_SLOTS][MT_CNT];
 	int			events_since_last_syn;
 

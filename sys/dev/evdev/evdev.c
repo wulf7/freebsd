@@ -139,6 +139,8 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 
 	/* Initialize multitouch protocol type B states */
 	evdev->current_mt_slot = -1;
+	evdev->last_reported_mt_slot = -1;
+	evdev->postponed_mt_slot = -1;
 	for (i = 0; i < MAX_MT_SLOTS; i++)
 		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 
@@ -390,9 +392,10 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		evdev->ev_absinfo[code].value = value;
 		/* Don`t repeat MT protocol type B events */
 		if (code == ABS_MT_SLOT) {
-			if (evdev->current_mt_slot == value)
-				return (0);
 			evdev->current_mt_slot = value;
+			/* Postpone ABS_MT_SLOT till next event */
+			evdev->postponed_mt_slot = value;
+			return (0);
 		} else if (ABS_IS_MT(code)) {
 			if (evdev->ev_mt_states[evdev->current_mt_slot]
 			    [ABS_MT_INDEX(code)] == value)
@@ -405,6 +408,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 	/* Skip empty reports */
 	if (type == EV_SYN) {
+		evdev->postponed_mt_slot = -1;
 		if (evdev->events_since_last_syn == 0)
 			return (0);
 		evdev->events_since_last_syn = 0;
@@ -414,10 +418,19 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 	/* Propagate event through all clients */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+		/* report postponed ABS_MT_SLOT */
+		if (evdev->postponed_mt_slot != -1)
+			evdev_client_push(client,
+			    EV_ABS, ABS_MT_SLOT, evdev->postponed_mt_slot);
 		evdev_client_push(client, type, code, value);
 
 		if (client->ec_ev_notify != NULL)
 			client->ec_ev_notify(client, client->ec_ev_arg);
+	}
+
+	if  (evdev->postponed_mt_slot != -1) {
+		evdev->last_reported_mt_slot = evdev->postponed_mt_slot;
+		evdev->postponed_mt_slot = -1;
 	}
 
 	return (0);
