@@ -102,6 +102,7 @@ struct evdev_cdev_state
 	bool			ecs_async;
 	bool			ecs_revoked;
 	bool			ecs_blocked;
+	bool			ecs_selected;
 };
 
 static int
@@ -258,8 +259,10 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 		EVDEV_CLIENT_LOCKQ(client);
 		if (!EVDEV_CLIENT_EMPTYQ(client))
 			revents = events & (POLLIN | POLLRDNORM);
-		else
+		else {
+			state->ecs_selected = true;
 			selrecord(td, &state->ecs_selp);
+		}
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 
@@ -584,7 +587,10 @@ evdev_notify_event(struct evdev_client *client, void *data)
 		state->ecs_blocked = false;
 		wakeup(client);
 	}
-	selwakeup(&state->ecs_selp);
+	if (state->ecs_selected) {
+		state->ecs_selected = false;
+		selwakeup(&state->ecs_selp);
+	}
 
 	if (state->ecs_async && state->ecs_sigio != NULL)
 		pgsigio(&state->ecs_sigio, SIGIO, 0);
