@@ -155,6 +155,8 @@ struct evdev_client
 
 #define	EVDEV_CLIENT_LOCKQ(client)	mtx_lock(&(client)->ec_buffer_mtx)
 #define	EVDEV_CLIENT_UNLOCKQ(client)	mtx_unlock(&(client)->ec_buffer_mtx)
+#define EVDEV_CLIENT_LOCKQ_ASSERT(client) \
+    mtx_assert(&(client)->ec_buffer_mtx, MA_OWNED)
 #define	EVDEV_CLIENT_EMPTYQ(client) \
     ((client)->ec_buffer_head == (client)->ec_buffer_tail)
 

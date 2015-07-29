@@ -578,6 +578,7 @@ evdev_notify_event(struct evdev_client *client, void *data)
 {
 	struct evdev_cdev_state *state = (struct evdev_cdev_state *)data;
 
+	wakeup(client);
 	selwakeup(&state->ecs_selp);
 
 	if (state->ecs_async && state->ecs_sigio != NULL)

@@ -420,7 +420,8 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		if (!client->ec_enabled)
 			continue;
-	
+
+		EVDEV_CLIENT_LOCKQ(client);
 		/* report postponed ABS_MT_SLOT */
 		if (evdev->postponed_mt_slot != -1)
 			evdev_client_push(client,
@@ -429,6 +430,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 		if (client->ec_ev_notify != NULL)
 			client->ec_ev_notify(client, client->ec_ev_arg);
+		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 
 	if  (evdev->postponed_mt_slot != -1) {
@@ -627,7 +629,7 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 {
 	int count, head, tail;
 	
-	EVDEV_CLIENT_LOCKQ(client);
+	EVDEV_CLIENT_LOCKQ_ASSERT(client);
 	head = client->ec_buffer_head;
 	tail = client->ec_buffer_tail;
 	count = client->ec_buffer_size;
@@ -640,17 +642,12 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 		/* Check whether we placed SYN_DROPPED packet already */
 		if (client->ec_buffer[tail - 2 % count].type == EV_SYN &&
 		    client->ec_buffer[tail - 2 % count].code == SYN_DROPPED) {
-			wakeup(client);
-			EVDEV_CLIENT_UNLOCKQ(client);
 			return;
 		}
 
 		microtime(&client->ec_buffer[tail - 1].time);
 		client->ec_buffer[tail - 1].type = EV_SYN;
 		client->ec_buffer[tail - 1].code = SYN_DROPPED;
-
-		wakeup(client);
-		EVDEV_CLIENT_UNLOCKQ(client);
 		return;
 	}
 
@@ -659,9 +656,6 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 	client->ec_buffer[tail].code = code;
 	client->ec_buffer[tail].value = value;
 	client->ec_buffer_tail = (tail + 1) % count;
-
-	wakeup(client);
-	EVDEV_CLIENT_UNLOCKQ(client);
 }
 
 void
