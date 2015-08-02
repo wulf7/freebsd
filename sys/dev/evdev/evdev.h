@@ -99,6 +99,7 @@ struct evdev_dev
 	struct mtx		ev_mtx;
 	struct input_id		ev_id;
 	bool			ev_grabbed;
+	bool			ev_running;
 
 	/* Supported features: */
 	unsigned long		ev_type_flags[nlongs(EV_CNT)];

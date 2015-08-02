@@ -108,12 +108,16 @@ static int
 evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	struct evdev_cdev_softc *sc = dev->si_drv1;
+	struct evdev_dev *evdev = sc->ecs_evdev;
 	struct evdev_cdev_state *state;
 	int ret;
 
+	if (!evdev->ev_running)
+		return (ENODEV);
+
 	state = malloc(sizeof(struct evdev_cdev_state), M_EVDEV, M_WAITOK | M_ZERO);
 	
-	ret = evdev_register_client(sc->ecs_evdev, &state->ecs_client);
+	ret = evdev_register_client(evdev, &state->ecs_client);
 	if (ret != 0) {
 		free(state, M_EVDEV);
 		debugf("cdev: cannot register evdev client");
@@ -156,6 +160,8 @@ evdev_dtor(void *data)
 static int
 evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
+	struct evdev_cdev_softc *sc = dev->si_drv1;
+	struct evdev_dev *evdev = sc->ecs_evdev;
 	struct evdev_cdev_state *state;
 	struct evdev_client *client;
 	struct input_event *event;
@@ -169,7 +175,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_revoked)
+	if (state->ecs_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	client = state->ecs_client;
@@ -218,6 +224,8 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
+	struct evdev_cdev_softc *sc = dev->si_drv1;
+	struct evdev_dev *evdev = sc->ecs_evdev;
 	struct evdev_cdev_state *state;
 	int ret = 0;
 	
@@ -228,7 +236,7 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_revoked)
+	if (state->ecs_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	if (uio->uio_resid % sizeof(struct input_event) != 0) {
@@ -242,6 +250,8 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 evdev_poll(struct cdev *dev, int events, struct thread *td)
 {
+	struct evdev_cdev_softc *sc = dev->si_drv1;
+	struct evdev_dev *evdev = sc->ecs_evdev;
 	struct evdev_client *client;
 	struct evdev_cdev_state *state;
 	int ret;
@@ -253,7 +263,7 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 	if (ret != 0)
 		return (POLLNVAL);
 
-	if (state->ecs_revoked)
+	if (state->ecs_revoked || !evdev->ev_running)
 		return (POLLNVAL);
 
 	client = state->ecs_client;
@@ -275,6 +285,8 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 static int
 evdev_kqfilter(struct cdev *dev, struct knote *kn)
 {
+	struct evdev_cdev_softc *sc = dev->si_drv1;
+	struct evdev_dev *evdev = sc->ecs_evdev;
 	struct evdev_cdev_state *state;
 	int ret;
 
@@ -282,7 +294,7 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_revoked)
+	if (state->ecs_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	switch(kn->kn_filter) {
@@ -340,7 +352,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_revoked)
+	if (state->ecs_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	/* file I/O ioctl handling */

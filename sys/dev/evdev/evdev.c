@@ -145,6 +145,7 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 
 	/* Create char device node */
+	evdev->ev_running = true;
 	ret = evdev_cdev_create(evdev);
 	if (ret != 0)
 		return (ret);
@@ -155,8 +156,20 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 int
 evdev_unregister(device_t dev, struct evdev_dev *evdev)
 {
+	struct evdev_client *client;
 	int ret;
 	device_printf(dev, "unregistered evdev provider: %s\n", evdev->ev_name);
+
+	EVDEV_LOCK(evdev);
+	evdev->ev_running = false;
+	/* Wake up sleepers */
+	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+		EVDEV_CLIENT_LOCKQ(client);
+		if (client->ec_ev_notify != NULL)
+			client->ec_ev_notify(client, client->ec_ev_arg);
+		EVDEV_CLIENT_UNLOCKQ(client);
+	}
+	EVDEV_UNLOCK(evdev);
 
 	ret = evdev_cdev_destroy(evdev);
 	if (ret != 0)
