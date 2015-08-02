@@ -116,6 +116,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	
 	ret = evdev_register_client(sc->ecs_evdev, &state->ecs_client);
 	if (ret != 0) {
+		free(state, M_EVDEV);
 		debugf("cdev: cannot register evdev client");
 		return (ret);
 	}
