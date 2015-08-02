@@ -119,7 +119,6 @@ uinput_dtor(void *data)
 	if (state->ucs_connected)
 		evdev_unregister(NULL, state->ucs_evdev);
 
-	evdev_free(state->ucs_evdev);
 	free(data, M_EVDEV);
 }
 

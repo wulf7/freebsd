@@ -148,9 +148,9 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	evdev->ev_running = true;
 	ret = evdev_cdev_create(evdev);
 	if (ret != 0)
-		return (ret);
+		mtx_destroy(&evdev->ev_mtx);
 
-	return (0);
+	return (ret);
 }
 
 int
