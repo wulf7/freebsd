@@ -1547,6 +1547,21 @@ psmattach(device_t dev)
 	evdev_support_event(sc->evdev, EV_KEY);
 	evdev_support_rel(sc->evdev, REL_X);
 	evdev_support_rel(sc->evdev, REL_Y);
+	/* Advertize extra axises for some models */
+	switch (sc->hw.model) {
+	case MOUSE_MODEL_MOUSEMANPLUS:
+	case MOUSE_MODEL_4D:
+	case MOUSE_MODEL_SYNAPTICS:
+		evdev_support_rel(sc->evdev, REL_HWHEEL);
+		/* FALLTHROUGH */
+	case MOUSE_MODEL_EXPLORER:
+	case MOUSE_MODEL_INTELLI:
+	case MOUSE_MODEL_NET:
+	case MOUSE_MODEL_NETSCROLL:
+	case MOUSE_MODEL_4DPLUS:
+		evdev_support_rel(sc->evdev, REL_WHEEL);
+		break;
+	}
 
 	for (i = 0; i < sc->hw.buttons; i++)
 		evdev_support_key(sc->evdev, BTN_MOUSE + i);
@@ -3761,7 +3776,36 @@ psmsoftintr(void *arg)
 	if (sc->state & PSM_EV_OPEN) {
 		if (x != 0 || y != 0) {
 			evdev_push_event(sc->evdev, EV_REL, REL_X, x);
-			evdev_push_event(sc->evdev, EV_REL, REL_Y, y);
+			evdev_push_event(sc->evdev, EV_REL, REL_Y, -y);
+		}
+
+		if (z != 0) {
+			switch (sc->hw.model) {
+			case MOUSE_MODEL_EXPLORER:
+			case MOUSE_MODEL_INTELLI:
+			case MOUSE_MODEL_NET:
+			case MOUSE_MODEL_NETSCROLL:
+			case MOUSE_MODEL_4DPLUS:
+				evdev_push_event
+				    (sc->evdev, EV_REL, REL_WHEEL, -z);
+				break;
+			case MOUSE_MODEL_MOUSEMANPLUS:
+			case MOUSE_MODEL_4D:
+			case MOUSE_MODEL_SYNAPTICS:
+				switch (z) {
+				case 1:
+				case -1:
+					evdev_push_event (sc->evdev, EV_REL,
+					    REL_WHEEL, -z);
+					break;
+				case 2:
+				case -2:
+					evdev_push_event (sc->evdev, EV_REL,
+					    REL_HWHEEL, z / 2);
+					break;
+				}
+				break;
+			}
 		}
 
 		if (ms.obutton ^ ms.button) {
