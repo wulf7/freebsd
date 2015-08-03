@@ -476,8 +476,8 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		atkbd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
 
 #ifdef EVDEV
-		/* register as evdev provider */
-		if (dev != NULL) {
+		/* register as evdev provider on first init */
+		if (dev != NULL && state->ks_evdev == NULL) {
 			evdev = evdev_alloc();
 			evdev_set_name(evdev, device_get_desc(dev));
 			evdev_set_serial(evdev, "0");
