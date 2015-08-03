@@ -708,10 +708,10 @@ ums_attach(device_t dev)
 		evdev_support_rel(sc->sc_evdev, REL_Y);
 
 	if (info->sc_flags & UMS_FLAG_Z_AXIS)
-		evdev_support_rel(sc->sc_evdev, REL_Z);
+		evdev_support_rel(sc->sc_evdev, REL_WHEEL);
 
 	if (info->sc_flags & UMS_FLAG_T_AXIS)
-		evdev_support_rel(sc->sc_evdev, REL_MISC);
+		evdev_support_rel(sc->sc_evdev, REL_HWHEEL);
 
 	for (i = 0; i < info->sc_buttons; i++)
 		evdev_support_key(sc->sc_evdev, BTN_MOUSE + i);
@@ -892,19 +892,24 @@ ums_put_queue(struct ums_softc *sc, int32_t dx, int32_t dy,
 		/* Push evdev event */
 		if (dx != 0 || dy != 0) {
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_X, dx);
-			evdev_push_event(sc->sc_evdev, EV_REL, REL_Y, dy);
+			evdev_push_event(sc->sc_evdev, EV_REL, REL_Y, -dy);
 		}
+		if (dz != 0)
+			evdev_push_event(sc->sc_evdev, EV_REL, REL_WHEEL, -dz);
+		if (dt != 0)
+			evdev_push_event(sc->sc_evdev, EV_REL, REL_HWHEEL, dt);
 
 		if (buttons != oldbuttons) {
 			int i;
 
 			for (i = 0; i < sc->sc_buttons; i++) {
-				if (((buttons & (1 << i)) ^
-				    (oldbuttons & (1 << i))) == 0)
+				if (((buttons & (1 << UMS_BUT(i))) ^
+				    (oldbuttons & (1 << UMS_BUT(i)))) == 0)
 					continue;
 
 				evdev_push_event(sc->sc_evdev, EV_KEY,
-				    BTN_MOUSE + i, !!(buttons & (1 << i)));
+				    BTN_MOUSE + i,
+				    !!(buttons & (1 << UMS_BUT(i))));
 			}
 		}
 
