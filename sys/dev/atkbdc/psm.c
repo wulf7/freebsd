@@ -1616,12 +1616,17 @@ static int
 psm_ev_open(struct evdev_dev *evdev, void *ev_softc)
 {
 	struct psm_softc *sc = (struct psm_softc *)ev_softc;
-	int err;
+	int err = 0;
 
-	if (sc->state & PSM_OPEN)
-		return (0);
+	/* Get device data */
+	if ((sc == NULL) || (sc->state & PSM_VALID) == 0) {
+		/* the device is no longer valid/functioning */
+		return (ENXIO);
+	}
 
-	err = psmopen(sc);
+	if (!(sc->state & PSM_OPEN))
+		err = psmopen(sc);
+
 	if (err == 0)
 		sc->state |= PSM_EV_OPEN;
 
@@ -1646,7 +1651,7 @@ static int
 psm_cdev_open(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct psm_softc *sc;
-	int err;
+	int err = 0;
 
 	/* Get device data */
 	sc = dev->si_drv1;
@@ -1661,11 +1666,10 @@ psm_cdev_open(struct cdev *dev, int flag, int fmt, struct thread *td)
 
 #ifdef EVDEV
 	/* Already opened by evdev */
-	if (sc->state & PSM_EV_OPEN)
-		return (0);
+	if (!(sc->state & PSM_EV_OPEN))
 #endif
+		err = psmopen(sc);
 
-	err = psmopen(sc);
 	if (err == 0)
 		sc->state |= PSM_OPEN;
 
@@ -1676,7 +1680,7 @@ static int
 psm_cdev_close(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct psm_softc *sc;
-	int err;
+	int err = 0;
 
 	/* Get device data */
 	sc = dev->si_drv1;
@@ -1687,11 +1691,10 @@ psm_cdev_close(struct cdev *dev, int flag, int fmt, struct thread *td)
 
 #ifdef EVDEV
 	/* Still opened by evdev */
-	if (sc->state & PSM_EV_OPEN)
-		return (0);
+	if (!(sc->state & PSM_EV_OPEN))
 #endif
+		err = psmclose(sc);
 
-	err = psmclose(sc);
 	if (err == 0)
 		sc->state &= ~PSM_OPEN;
 
