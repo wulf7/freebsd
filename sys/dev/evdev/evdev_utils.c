@@ -147,6 +147,42 @@ static uint16_t evdev_at_set1_scancodes[] = {
 	NONE,		NONE,	KEY_ZENKAKUHANKAKU,	KEY_HIRAGANA,
 	KEY_KATAKANA,	KEY_HENKAN,	NONE,		KEY_MUHENKAN,
 	NONE,		KEY_YEN,	KEY_KPCOMMA,	NONE,
+	/* 0x00 - 0x1f. 0xE0 prefixed */
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		KEY_KPENTER,	KEY_RIGHTCTRL,	NONE,
+	/* 0x20 - 0x3f. 0xE0 prefixed */
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		KEY_KPASTERISK,	NONE,		KEY_SYSRQ,
+	KEY_RIGHTALT,	NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	/* 0x40 - 0x5f. 0xE0 prefixed */
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		KEY_PAUSE,	KEY_HOME,
+	KEY_UP,		KEY_PAGEUP,	NONE,		KEY_LEFT,
+	NONE,		KEY_RIGHT,	NONE,		KEY_END,
+	KEY_DOWN,	KEY_PAGEDOWN,	KEY_INSERT,	KEY_DELETE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		KEY_LEFTMETA,
+	KEY_RIGHTMETA,	KEY_MENU,	KEY_POWER,	KEY_SLEEP,
+	/* 0x60 - 0x7f. 0xE0 prefixed */
+	NONE,		NONE,		NONE,		KEY_WAKEUP,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
 };
 
 
@@ -154,6 +190,16 @@ inline uint16_t
 evdev_hid2key(int scancode)
 {
 	return evdev_usb_scancodes[scancode];
+}
+
+inline void
+evdev_support_all_known_keys(struct evdev_dev *evdev)
+{
+	size_t i;
+
+	for (i = KEY_RESERVED; i < nitems(evdev_at_set1_scancodes); i++)
+		if (evdev_at_set1_scancodes[i] != NONE)
+			evdev_support_key(evdev, evdev_at_set1_scancodes[i]);
 }
 
 inline uint16_t
@@ -174,77 +220,7 @@ evdev_scancode2key(int *state, int scancode)
 		break;
 	case 0xE0:		/* 0xE0 prefix */
 		*state = 0;
-		switch (scancode & 0x7f) {
-		case 0x1C:	/* right enter key */
-			keycode = KEY_KPENTER;
-			break;
-		case 0x1D:	/* right ctrl key */
-			keycode = KEY_RIGHTCTRL;
-			break;
-		case 0x35:	/* keypad divide key */
-			keycode = KEY_KPASTERISK;
-			break;
-		case 0x37:	/* print scrn key */
-			keycode = KEY_SYSRQ;
-			break;
-		case 0x38:	/* right alt key (alt gr) */
-			keycode = KEY_RIGHTALT;
-			break;
-		case 0x46:	/* ctrl-pause/break on AT 101 (see below) */
-			keycode = KEY_PAUSE;
-			break;
-		case 0x47:	/* grey home key */
-			keycode = KEY_HOME;
-			break;
-		case 0x48:	/* grey up arrow key */
-			keycode = KEY_UP;
-			break;
-		case 0x49:	/* grey page up key */
-			keycode = KEY_PAGEUP;
-			break;
-		case 0x4B:	/* grey left arrow key */
-			keycode = KEY_LEFT;
-			break;
-		case 0x4D:	/* grey right arrow key */
-			keycode = KEY_RIGHT;
-			break;
-		case 0x4F:	/* grey end key */
-			keycode = KEY_END;
-			break;
-		case 0x50:	/* grey down arrow key */
-			keycode = KEY_DOWN;
-			break;
-		case 0x51:	/* grey page down key */
-			keycode = KEY_PAGEDOWN;
-			break;
-		case 0x52:	/* grey insert key */
-			keycode = KEY_INSERT;
-			break;
-		case 0x53:	/* grey delete key */
-			keycode = KEY_DELETE;
-			break;
-			/* the following 3 are only used on the MS "Natural" keyboard */
-		case 0x5b:	/* left Window key */
-			keycode = KEY_LEFTMETA;
-			break;
-		case 0x5c:	/* right Window key */
-			keycode = KEY_RIGHTMETA;
-			break;
-		case 0x5d:	/* menu key */
-			keycode = KEY_MENU;
-			break;
-		case 0x5e:	/* power key */
-			keycode = KEY_POWER;
-			break;
-		case 0x5f:	/* sleep key */
-			keycode = KEY_SLEEP;
-			break;
-		case 0x63:	/* wake key */
-			keycode = KEY_WAKEUP;
-			break;
-		default:	/* ignore everything else */
-			return (NONE);
-		}
+		keycode = evdev_at_set1_scancodes[0x80 + (scancode & 0x7f)];
 		break;
    	case 0xE1:	/* 0xE1 prefix */
 		/* 

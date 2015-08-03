@@ -197,6 +197,7 @@ void evdev_client_filter_queue(struct evdev_client *, uint16_t);
 
 /* Utility functions: */
 uint16_t evdev_hid2key(int);
+void evdev_support_all_known_keys(struct evdev_dev *);
 uint16_t evdev_scancode2key(int *, int);
 void evdev_client_dumpqueue(struct evdev_client *);
 

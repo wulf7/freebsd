@@ -387,7 +387,6 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 	int error, needfree;
 #ifdef EVDEV
 	struct evdev_dev *evdev;
-	int i;
 	device_t dev = data->dev;
 #endif
 
@@ -485,9 +484,7 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 			evdev_set_softc(evdev, state);
 			evdev_support_event(evdev, EV_SYN);
 			evdev_support_event(evdev, EV_KEY);
-
-			for (i = KEY_RESERVED; i <= KEY_KPDOT; i++)
-				evdev_support_key(evdev, i);
+			evdev_support_all_known_keys(evdev);
 
 			evdev_register(dev, evdev);
 			state->ks_evdev = evdev;
