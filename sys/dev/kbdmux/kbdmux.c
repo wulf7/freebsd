@@ -446,7 +446,6 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 #ifdef EVDEV
 	struct evdev_dev *evdev;
 	char phys_loc[NAMELEN];
-	int i;
 #endif
 
 	if (*kbdp == NULL) {
@@ -519,9 +518,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_set_softc(evdev, state);
 		evdev_support_event(evdev, EV_SYN);
 		evdev_support_event(evdev, EV_KEY);
-
-		for (i = KEY_RESERVED; i <= KEY_KPDOT; i++)
-			evdev_support_key(evdev, i);
+		evdev_support_all_known_keys(evdev);
 
 		evdev_register(NULL, evdev);
 		state->ks_evdev = evdev;
