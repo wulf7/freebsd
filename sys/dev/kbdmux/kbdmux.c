@@ -445,6 +445,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 	int		 error, needfree, fkeymap_size, delay[2];
 #ifdef EVDEV
 	struct evdev_dev *evdev;
+	char phys_loc[NAMELEN];
 	int i;
 #endif
 
@@ -511,7 +512,8 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		/* register as evdev provider */
 		evdev = evdev_alloc();
 		evdev_set_name(evdev, "System keyboard multiplexer");
-		evdev_set_phys(evdev, KEYBOARD_NAME);
+		snprintf(phys_loc, NAMELEN, KEYBOARD_NAME"%d", unit);
+		evdev_set_phys(evdev, phys_loc);
 		evdev_set_serial(evdev, "0");
 		evdev_set_methods(evdev, &kbdmux_evdev_methods);
 		evdev_set_softc(evdev, state);
