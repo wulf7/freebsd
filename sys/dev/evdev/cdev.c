@@ -45,7 +45,7 @@
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
 
-#define	DEBUG
+#undef	DEBUG
 #ifdef DEBUG
 #define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args);
 #else
