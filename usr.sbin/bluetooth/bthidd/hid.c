@@ -49,6 +49,10 @@
 #include "bthidd.h"
 #include "kbd.h"
 
+#ifdef UINPUT
+#include "uinput.h"
+#endif
+
 /*
  * Process data from control channel
  */
@@ -409,6 +413,14 @@ hid_interrupt(bthid_session_p s, uint8_t *data, int32_t len)
 			syslog(LOG_ERR, "Could not process mouse events from " \
 				"%s. %s (%d)", bt_ntoa(&s->bdaddr, NULL),
 				strerror(errno), errno);
+#ifdef UINPUT
+		if (hid_device->mouse && s->uinput >= 0 &&
+		    uinput_report_mouse(s->uinput, &mi, s->obutt) < 0)
+			syslog(LOG_ERR, "Could not process mouse events from " \
+				"%s. %s (%d)", bt_ntoa(&s->bdaddr, NULL),
+				strerror(errno), errno);
+		s->obutt = mouse_butt;
+#endif
 	}
 
 	return (0);

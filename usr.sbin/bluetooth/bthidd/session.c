@@ -47,6 +47,10 @@
 #include "bthidd.h"
 #include "kbd.h"
 
+#ifdef UINPUT
+#include "uinput.h"
+#endif
+
 /*
  * Create new session
  */
@@ -66,6 +70,10 @@ session_open(bthid_server_p srv, hid_device_p const d)
 	memcpy(&s->bdaddr, &d->bdaddr, sizeof(s->bdaddr));
 	s->ctrl = -1;
 	s->intr = -1;
+#ifdef UINPUT
+	s->uinput = -1;
+	s->obutt = 0;
+#endif
 
 	if (d->keyboard) {
 		/* Open /dev/vkbdctl */
@@ -77,8 +85,18 @@ session_open(bthid_server_p srv, hid_device_p const d)
 			free(s);
 			return (NULL);
 		}
-	} else
+	} else {
+#ifdef UINPUT
+		if (d->mouse) {
+			s->uinput = uinput_open_mouse(d);
+			if (s->uinput < 0)
+				syslog(LOG_ERR, "Could not open /dev/uinput " \
+					"for %s. %s (%d)", bt_ntoa(&s->bdaddr,
+					NULL), strerror(errno), errno);
+		}
+#endif
 		s->vkbd = -1;
+	}
 
 	s->state = CLOSED;
 
@@ -175,6 +193,11 @@ session_close(bthid_session_p s)
 		if (s->srv->maxfd == s->vkbd)
 			s->srv->maxfd --;
 	}
+
+#ifdef UINPUT
+	if (s->uinput != -1)
+		close(s->uinput);
+#endif
 
 	free(s->keys1);
 	free(s->keys2);

@@ -1,9 +1,5 @@
-/*
- * bthid_config.h
- */
-
 /*-
- * Copyright (c) 2006 Maksim Yevmenkin <m_evmenkin@yahoo.com>
+ * Copyright (c) 2015 Vladimir Kondratyev <wulf@cicgroup.ru>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,45 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: bthid_config.h,v 1.4 2006/09/07 21:06:53 max Exp $
  * $FreeBSD$
  */
 
-#ifndef _BTHID_CONFIG_H_
-#define _BTHID_CONFIG_H_ 1
+#ifndef _UINPUT_H_
+#define _UINPUT_H_
 
-#define BTHIDD_CONFFILE		"/etc/bluetooth/bthidd.conf"
-#define BTHIDD_HIDSFILE		"/var/db/bthidd.hids"
+#include <sys/consio.h>
 
-struct hid_device
-{
-	bdaddr_t		bdaddr;		/* HID device BDADDR */
-	uint16_t		control_psm;	/* control PSM */
-	uint16_t		interrupt_psm;	/* interrupt PSM */
-	unsigned		new_device           : 1;
-	unsigned		reconnect_initiate   : 1;
-	unsigned		battery_power        : 1;
-	unsigned		normally_connectable : 1;
-	unsigned		keyboard             : 1;
-	unsigned		mouse                : 1;
-	unsigned		reserved             : 10;
-	report_desc_t		desc;		/* HID report descriptor */
-	LIST_ENTRY(hid_device)	next;		/* link to the next */
-};
-typedef struct hid_device	hid_device_t;
-typedef struct hid_device *	hid_device_p;
+int uinput_open_mouse  (hid_device_p const d);
+int uinput_report_mouse(int fd, struct mouse_info *mi, int32_t obutt);
 
-extern char const	*config_file;
-extern char const	*hids_file;
-
-int32_t		read_config_file	(void);
-void		clean_config		(void);
-hid_device_p	get_hid_device		(bdaddr_p bdaddr);
-hid_device_p	get_next_hid_device	(hid_device_p d);
-void		print_hid_device	(hid_device_p hid_device, FILE *f);
-
-int32_t		read_hids_file		(void);
-int32_t		write_hids_file		(void);
-
-#endif /* ndef _BTHID_CONFIG_H_ */
-
+#endif /* ndef _UINPUT_H_ */

@@ -60,6 +60,10 @@ struct bthid_session
 	int32_t				 ctrl;	/* control channel */
 	int32_t				 intr;	/* interrupt channel */
 	int32_t				 vkbd;	/* virual keyboard */
+#ifdef UINPUT
+	int32_t				 uinput;/* evdev user input */
+	int32_t				 obutt; /* previous mouse buttons */
+#endif
 	bdaddr_t			 bdaddr;/* remote bdaddr */
 	uint16_t			 state;	/* session state */
 #define CLOSED	0

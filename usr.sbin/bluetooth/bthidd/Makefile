@@ -9,6 +9,9 @@ SRCS=		bthidd.c client.c hid.c kbd.c lexer.l parser.y server.c \
 
 CFLAGS+=	-I${.CURDIR}
 
+SRCS+=		uinput.c
+CFLAGS+=	-DUINPUT
+
 LIBADD+=	bluetooth usbhid
 
 NO_WMISSING_VARIABLE_DECLARATIONS=
