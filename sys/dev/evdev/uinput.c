@@ -307,6 +307,10 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	case UI_SET_PROPBIT:
 		break;
+
+	case UI_GET_VERSION:
+		*(unsigned int *)data = UINPUT_VERSION;
+		break;
 	}
 	
 	return (0);
