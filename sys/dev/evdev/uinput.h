@@ -58,9 +58,6 @@ struct uinput_ff_erase {
 #define UI_DEV_CREATE		_IO(UINPUT_IOCTL_BASE, 1)
 #define UI_DEV_DESTROY		_IO(UINPUT_IOCTL_BASE, 2)
 
-/* FreeBSD-specific one */
-#define	UI_DEV_GETPATH		_IOR(UINPUT_IOCTL_BASE, 50, char[UINPUT_MAXLEN])
-
 #define UI_SET_EVBIT		_IOWINT(UINPUT_IOCTL_BASE, 100)
 #define UI_SET_KEYBIT		_IOWINT(UINPUT_IOCTL_BASE, 101)
 #define UI_SET_RELBIT		_IOWINT(UINPUT_IOCTL_BASE, 102)
@@ -79,11 +76,11 @@ struct uinput_ff_erase {
 #define UI_END_FF_ERASE		_IOW(UINPUT_IOCTL_BASE, 203, struct uinput_ff_erase)
 
 /**
- * UI_GET_SYSNAME - get the sysfs name of the created uinput device
+ * UI_GET_SYSNAME - get the devfs name of the created uinput device
  *
- * @return the sysfs name of the created virtual input device.
- * The complete sysfs path is then /sys/devices/virtual/input/--NAME--
- * Usually, it is in the form "inputN"
+ * @return the devfs name of the created virtual input device.
+ * The complete devfs path is then /dev/input/--NAME--
+ * Usually, it is in the form "eventN"
  */
 #define UI_GET_SYSNAME(len)	_IOC(IOC_OUT, UINPUT_IOCTL_BASE, 44, len)
 

@@ -243,6 +243,16 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	if (ret != 0)
 		return (ret);
 
+	switch (IOCBASECMD(cmd)) {
+	case UI_GET_SYSNAME(0):
+		if (!state->ucs_connected)
+			return (ENOENT);
+		if (len == 0)
+			return (EINVAL);
+		snprintf(data, len, "event%d", state->ucs_evdev->ev_unit);
+		return (0);
+	}
+
 	switch (cmd) {
 	case UI_DEV_CREATE:
 		evdev_set_methods(state->ucs_evdev, &uinput_ev_methods);
@@ -257,11 +267,6 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		evdev_unregister(NULL, state->ucs_evdev);
 		state->ucs_connected = false;
-		break;
-
-	case UI_DEV_GETPATH:
-		snprintf((char *)data, UINPUT_MAXLEN, "input/event%d",
-		    state->ucs_evdev->ev_unit);
 		break;
 
 	case UI_SET_EVBIT:
