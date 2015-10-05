@@ -38,7 +38,7 @@
 #include <dev/evdev/input.h>
 
 #define UINPUT_VERSION		4
-#define	UINPUT_MAXLEN		80
+
 
 struct uinput_ff_upload {
 	uint32_t		request_id;
@@ -66,7 +66,7 @@ struct uinput_ff_erase {
 #define UI_SET_LEDBIT		_IOWINT(UINPUT_IOCTL_BASE, 105)
 #define UI_SET_SNDBIT		_IOWINT(UINPUT_IOCTL_BASE, 106)
 #define UI_SET_FFBIT		_IOWINT(UINPUT_IOCTL_BASE, 107)
-#define UI_SET_PHYS		_IOW(UINPUT_IOCTL_BASE, 108, char[UINPUT_MAXLEN])
+#define UI_SET_PHYS		_IO(UINPUT_IOCTL_BASE, 108)
 #define UI_SET_SWBIT		_IOWINT(UINPUT_IOCTL_BASE, 109)
 #define UI_SET_PROPBIT		_IOWINT(UINPUT_IOCTL_BASE, 110)
 

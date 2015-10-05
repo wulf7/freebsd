@@ -234,6 +234,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 {
 	struct uinput_cdev_state *state;
 	int ret, len;
+	char buf[NAMELEN];
 
 	len = IOCPARM_LEN(cmd);
 
@@ -298,7 +299,15 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		break;
 
 	case UI_SET_PHYS:
-		evdev_set_phys(state->ucs_evdev, (char *)data);
+		if (state->ucs_connected)
+			return (EINVAL);
+		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
+		/* Linux returns EINVAL when string does not fit the buffer */
+		if (ret == ENAMETOOLONG)
+			ret = EINVAL;
+		if (ret != 0)
+			return (ret);
+		evdev_set_phys(state->ucs_evdev, buf);
 		break;
 
 	case UI_SET_SWBIT:
