@@ -1316,8 +1316,8 @@ ukbd_attach(device_t dev)
 	evdev_support_event(sc->sc_evdev, EV_KEY);
 	evdev_support_repeat(sc->sc_evdev, DRIVER_REPEAT);
 
-	for (i = 0x01; i < 0x59; i++)
-		evdev_support_key(sc->sc_evdev, i);
+	for (i = 0x00; i <= 0xFF; i++)
+		evdev_support_key(sc->sc_evdev, evdev_hid2key(i));
 
 	evdev_register(dev, sc->sc_evdev);
 #endif
