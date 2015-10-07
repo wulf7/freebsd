@@ -74,7 +74,7 @@ struct evdev_dev
 	device_t		ev_dev;
 	void *			ev_softc;
 	struct cdev *		ev_cdev;
-	char			ev_cdev_name[NAMELEN];
+	int			ev_unit;
 	struct mtx		ev_mtx;
 	struct input_id		ev_id;
 	bool			ev_grabbed;

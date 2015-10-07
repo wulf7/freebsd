@@ -577,13 +577,10 @@ evdev_cdev_create(struct evdev_dev *evdev)
 	int ret, unit = 0;
 
 	/* Try to coexist with cuse-backed input/event devices */
-	do {
-		snprintf(evdev->ev_cdev_name, NAMELEN, "input/event%d",
-		    unit++);
-		ret = make_dev_p(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
-		    &cdev, &evdev_cdevsw, NULL, UID_ROOT, GID_WHEEL, 0600,
-		    "%s", evdev->ev_cdev_name);
-	} while (ret == EEXIST);
+	while ((ret = make_dev_p(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
+	    &cdev, &evdev_cdevsw, NULL, UID_ROOT, GID_WHEEL, 0600,
+	    "input/event%d", unit)) == EEXIST)
+		unit++;
 	if (ret != 0)
 		return (ret);
 
@@ -592,6 +589,7 @@ evdev_cdev_create(struct evdev_dev *evdev)
 	
 	sc->ecs_evdev = evdev;
 	evdev->ev_cdev = cdev;
+	evdev->ev_unit = unit;
 	cdev->si_drv1 = sc;
 	return (0);
 }

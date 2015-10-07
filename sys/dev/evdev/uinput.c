@@ -260,8 +260,8 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		break;
 
 	case UI_DEV_GETPATH:
-		strncpy((char *)data, state->ucs_evdev->ev_cdev_name,
-		    UINPUT_MAXLEN);
+		snprintf((char *)data, UINPUT_MAXLEN, "input/event%d",
+		    state->ucs_evdev->ev_unit);
 		break;
 
 	case UI_SET_EVBIT:
