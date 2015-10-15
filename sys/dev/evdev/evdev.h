@@ -140,10 +140,9 @@ struct evdev_client
 {
 	struct evdev_dev *	ec_evdev;
 	struct mtx		ec_buffer_mtx;
-	struct input_event *	ec_buffer;
-	int			ec_buffer_size;
-	int			ec_buffer_head;
-	int			ec_buffer_tail;
+	size_t			ec_buffer_size;
+	size_t			ec_buffer_head;
+	size_t			ec_buffer_tail;
 	bool			ec_enabled;
 	bool			ec_stall;
 
@@ -151,6 +150,8 @@ struct evdev_client
 	void *			ec_ev_arg;
 
 	LIST_ENTRY(evdev_client) ec_link;
+
+	struct input_event	ec_buffer[];
 };
 
 #define	EVDEV_CLIENT_LOCKQ(client)	mtx_lock(&(client)->ec_buffer_mtx)
