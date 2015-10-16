@@ -72,6 +72,12 @@ enum evdev_key_events
 	KEY_EVENT_REPEAT
 };
 
+enum evdev_clock_id
+{
+	EV_CLOCK_REALTIME = 0,
+	EV_CLOCK_MONOTONIC
+};
+
 struct evdev_methods
 {
 	evdev_open_t		*ev_open;
@@ -145,6 +151,7 @@ struct evdev_client
 	size_t			ec_buffer_tail;
 	bool			ec_enabled;
 	bool			ec_stall;
+	enum evdev_clock_id	ec_clock_id;
 
 	evdev_client_event_t *	ec_ev_notify;
 	void *			ec_ev_arg;

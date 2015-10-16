@@ -646,6 +646,16 @@ evdev_stop_repeat(struct evdev_dev *dev)
 #endif
 
 static void
+evdev_set_event_time(struct evdev_client *client, struct input_event *ie)
+{
+
+	if (client->ec_clock_id == EV_CLOCK_MONOTONIC)
+		microuptime(&ie->time);
+	else
+		microtime(&ie->time);
+}
+
+static void
 evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
     int32_t value)
 {
@@ -667,13 +677,13 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 			return;
 		}
 
-		microtime(&client->ec_buffer[tail - 1].time);
+		evdev_set_event_time(client, &client->ec_buffer[tail - 1]);
 		client->ec_buffer[tail - 1].type = EV_SYN;
 		client->ec_buffer[tail - 1].code = SYN_DROPPED;
 		return;
 	}
 
-	microtime(&client->ec_buffer[tail].time);
+	evdev_set_event_time(client, &client->ec_buffer[tail]);
 	client->ec_buffer[tail].type = type;
 	client->ec_buffer[tail].code = code;
 	client->ec_buffer[tail].value = value;

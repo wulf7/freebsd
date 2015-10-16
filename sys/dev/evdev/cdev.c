@@ -38,6 +38,7 @@
 #include <sys/fcntl.h>
 #include <sys/selinfo.h>
 #include <sys/malloc.h>
+#include <sys/time.h>
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
@@ -455,8 +456,16 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCSCLOCKID:
-		/* Fake unsupported ioctl */
-		return (0);
+		switch (*(int *)data) {
+		case CLOCK_REALTIME:
+			state->ecs_client->ec_clock_id = EV_CLOCK_REALTIME;
+			return (0);
+		case CLOCK_MONOTONIC:
+			state->ecs_client->ec_clock_id = EV_CLOCK_MONOTONIC;
+			return (0);
+		default:
+			return (EINVAL);
+		}
 	}
 
 	/* evdev variable-length ioctls handling */
