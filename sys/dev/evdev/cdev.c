@@ -363,24 +363,23 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	}
 
 	len = IOCPARM_LEN(cmd);
-	cmd = IOCBASECMD(cmd);
 	num = IOCNUM(cmd);
 	debugf("cdev: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
 
-	/* evdev ioctls handling */
+	/* evdev fixed-length ioctls handling */
 	switch (cmd) {
-	case IOCBASECMD(EVIOCGVERSION):
+	case EVIOCGVERSION:
 		*(int *)data = EV_VERSION;
 		break;
 
-	case IOCBASECMD(EVIOCGID):
+	case EVIOCGID:
 		debugf("cdev: EVIOCGID: bus=%d vendor=0x%04x product=0x%04x",
 		    evdev->ev_id.bustype, evdev->ev_id.vendor,
 		    evdev->ev_id.product);
 		memcpy(data, &evdev->ev_id, sizeof(struct input_id));
 		break;
 
-	case IOCBASECMD(EVIOCGREP):
+	case EVIOCGREP:
 		if (evdev->ev_repeat_mode == NO_REPEAT)
 			return (ENOTSUP);
 
@@ -389,7 +388,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		memcpy(data, rep_params, sizeof(rep_params));
 		break;
 
-	case IOCBASECMD(EVIOCSREP):
+	case EVIOCSREP:
 		if (evdev->ev_repeat_mode == NO_REPEAT)
 			return (ENOTSUP);
 
@@ -404,7 +403,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		break;
 
-	case IOCBASECMD(EVIOCGKEYCODE_V2):
+	case EVIOCGKEYCODE_V2:
 		if (evdev->ev_methods->ev_get_keycode == NULL)
 			return (ENOTSUP);
 
@@ -412,7 +411,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		evdev->ev_methods->ev_get_keycode(evdev, evdev->ev_softc, ke);
 		break;
 
-	case IOCBASECMD(EVIOCSKEYCODE_V2):
+	case EVIOCSKEYCODE_V2:
 		if (evdev->ev_methods->ev_set_keycode == NULL)
 			return (ENOTSUP);
 
@@ -420,6 +419,23 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		evdev->ev_methods->ev_set_keycode(evdev, evdev->ev_softc, ke);
 		break;
 
+	case EVIOCGRAB:
+		if (*(int *)data)
+			return (evdev_grab_client(state->ecs_client));
+		else
+			return (evdev_release_client(state->ecs_client));
+		/* NOTREACHED */
+
+	case EVIOCREVOKE:
+		if (*(int *)data != 0)
+			return (EINVAL);
+
+		state->ecs_revoked = true;
+		break;
+	}
+
+	/* evdev variable-length ioctls handling */
+	switch (IOCBASECMD(cmd)) {
 	case EVIOCGNAME(0):
 		strlcpy(data, evdev->ev_name, len);
 		break;
@@ -480,20 +496,6 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		evdev_client_filter_queue(state->ecs_client, EV_SW);
 		limit = MIN(len, howmany(SW_CNT, 8));
 		memcpy(data, evdev->ev_sw_states, limit);
-		break;
-
-	case IOCBASECMD(EVIOCGRAB):
-		if (*(int *)data)
-			return (evdev_grab_client(state->ecs_client));
-		else
-			return (evdev_release_client(state->ecs_client));
-		/* NOTREACHED */
-
-	case IOCBASECMD(EVIOCREVOKE):
-		if (*(int *)data != 0)
-			return (EINVAL);
-
-		state->ecs_revoked = true;
 		break;
 
 	}
