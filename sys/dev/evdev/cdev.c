@@ -367,14 +367,14 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	switch (cmd) {
 	case EVIOCGVERSION:
 		*(int *)data = EV_VERSION;
-		break;
+		return (0);
 
 	case EVIOCGID:
 		debugf("cdev: EVIOCGID: bus=%d vendor=0x%04x product=0x%04x",
 		    evdev->ev_id.bustype, evdev->ev_id.vendor,
 		    evdev->ev_id.product);
 		memcpy(data, &evdev->ev_id, sizeof(struct input_id));
-		break;
+		return (0);
 
 	case EVIOCGREP:
 		if (evdev->ev_repeat_mode == NO_REPEAT)
@@ -383,7 +383,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		rep_params[0] = evdev->ev_rep[REP_DELAY];
 		rep_params[1] = evdev->ev_rep[REP_PERIOD];
 		memcpy(data, rep_params, sizeof(rep_params));
-		break;
+		return (0);
 
 	case EVIOCSREP:
 		if (evdev->ev_repeat_mode == NO_REPEAT)
@@ -397,8 +397,11 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			evdev_inject_event(evdev, EV_REP, REP_DELAY, rep_params[0]);
 			evdev_inject_event(evdev, EV_REP, REP_PERIOD, rep_params[1]);
 		}
+		return (0);
 
-		break;
+	case EVIOCGKEYCODE:
+		/* Fake unsupported ioctl */
+		return (0);
 
 	case EVIOCGKEYCODE_V2:
 		if (evdev->ev_methods->ev_get_keycode == NULL)
@@ -406,7 +409,11 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		ke = (struct input_keymap_entry *)data;
 		evdev->ev_methods->ev_get_keycode(evdev, evdev->ev_softc, ke);
-		break;
+		return (0);
+
+	case EVIOCSKEYCODE:
+		/* Fake unsupported ioctl */
+		return (0);
 
 	case EVIOCSKEYCODE_V2:
 		if (evdev->ev_methods->ev_set_keycode == NULL)
@@ -414,59 +421,68 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		ke = (struct input_keymap_entry *)data;
 		evdev->ev_methods->ev_set_keycode(evdev, evdev->ev_softc, ke);
-		break;
+		return (0);
 
 	case EVIOCGABS(0) ... EVIOCGABS(ABS_MAX):
 		memcpy(data, &evdev->ev_absinfo[cmd - EVIOCGABS(0)],
 		    sizeof(struct input_absinfo));
-		break;
+		return (0);
 
 	case EVIOCSABS(0) ... EVIOCSABS(ABS_MAX):
 		EVDEV_LOCK(evdev);
 		memcpy(&evdev->ev_absinfo[cmd - EVIOCSABS(0)], data,
 		    sizeof(struct input_absinfo));
 		EVDEV_UNLOCK(evdev);
-		break;
+		return (0);
+
+	case EVIOCSFF:
+	case EVIOCRMFF:
+	case EVIOCGEFFECTS:
+		/* Fake unsupported ioctls */
+		return (0);
 
 	case EVIOCGRAB:
 		if (*(int *)data)
 			return (evdev_grab_client(state->ecs_client));
 		else
 			return (evdev_release_client(state->ecs_client));
-		/* NOTREACHED */
 
 	case EVIOCREVOKE:
 		if (*(int *)data != 0)
 			return (EINVAL);
 
 		state->ecs_revoked = true;
-		break;
+		return (0);
+
+	case EVIOCSCLOCKID:
+		/* Fake unsupported ioctl */
+		return (0);
 	}
 
 	/* evdev variable-length ioctls handling */
 	switch (IOCBASECMD(cmd)) {
 	case EVIOCGNAME(0):
 		strlcpy(data, evdev->ev_name, len);
-		break;
+		return (0);
 
 	case EVIOCGPHYS(0):
 		if (evdev->ev_dev == NULL && evdev->ev_shortname[0] == 0)
 			return (ENOENT);
 
 		strlcpy(data, evdev->ev_shortname, len);
-		break;
+		return (0);
 
 	case EVIOCGUNIQ(0):
 		if (evdev->ev_dev == NULL && evdev->ev_serial[0] == 0)
 			return (ENOENT);
 
 		strlcpy(data, evdev->ev_serial, len);
-		break;
+		return (0);
 
 	case EVIOCGPROP(0):
 		limit = MIN(len, howmany(EV_CNT, 8));
 		memcpy(data, evdev->ev_type_flags, limit);
-		break;
+		return (0);
 
 	case EVIOCGMTSLOTS(0):
 		if (len < sizeof(uint32_t))
@@ -479,33 +495,31 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		for (int i = 0; i < nvalues; i++)
 			((int32_t *)data)[i + 1] =
 			    evdev->ev_mt_states[i][ABS_MT_INDEX(code)];
-		break;
+		return (0);
 
 	case EVIOCGKEY(0):
 		evdev_client_filter_queue(state->ecs_client, EV_KEY);
 		limit = MIN(len, howmany(KEY_CNT, 8));
 		memcpy(data, evdev->ev_key_states, limit);
-		break;
+		return (0);
 
 	case EVIOCGLED(0):
 		evdev_client_filter_queue(state->ecs_client, EV_LED);
 		limit = MIN(len, howmany(LED_CNT, 8));
 		memcpy(data, evdev->ev_led_states, limit);
-
-		break;
+		return (0);
 
 	case EVIOCGSND(0):
 		evdev_client_filter_queue(state->ecs_client, EV_SND);
 		limit = MIN(len, howmany(SND_CNT, 8));
 		memcpy(data, evdev->ev_snd_states, limit);
-
-		break;
+		return (0);
 
 	case EVIOCGSW(0):
 		evdev_client_filter_queue(state->ecs_client, EV_SW);
 		limit = MIN(len, howmany(SW_CNT, 8));
 		memcpy(data, evdev->ev_sw_states, limit);
-		break;
+		return (0);
 
 	case EVIOCGBIT(0, 0) ... EVIOCGBIT(EV_MAX, 0):
 		type_num = IOCBASECMD(cmd) - EVIOCGBIT(0, 0);
@@ -513,10 +527,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (evdev_ioctl_eviocgbit(evdev, type_num, len, data));
 	}
 
-	if (IOCGROUP(cmd) != 'E')
-		return (EINVAL);
-
-	return (0);
+	return (EINVAL);
 }
 
 static int
