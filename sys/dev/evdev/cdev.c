@@ -49,8 +49,6 @@
 #define	debugf(fmt, args...)
 #endif
 
-#define	IOCNUM(x)	(x & 0xff)
-
 static int evdev_open(struct cdev *, int, int, struct thread *);
 static int evdev_close(struct cdev *, int, int, struct thread *);
 static int evdev_read(struct cdev *, struct uio *, int);
@@ -330,7 +328,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	struct evdev_cdev_state *state;
 	struct input_keymap_entry *ke;
 	int rep_params[2];
-	int ret, len, num, limit;
+	int ret, len, limit, type_num;
 	uint32_t code;
 	size_t nvalues;
 
@@ -363,7 +361,6 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	}
 
 	len = IOCPARM_LEN(cmd);
-	num = IOCNUM(cmd);
 	debugf("cdev: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
 
 	/* evdev fixed-length ioctls handling */
@@ -417,6 +414,18 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		ke = (struct input_keymap_entry *)data;
 		evdev->ev_methods->ev_set_keycode(evdev, evdev->ev_softc, ke);
+		break;
+
+	case EVIOCGABS(0) ... EVIOCGABS(ABS_MAX):
+		memcpy(data, &evdev->ev_absinfo[cmd - EVIOCGABS(0)],
+		    sizeof(struct input_absinfo));
+		break;
+
+	case EVIOCSABS(0) ... EVIOCSABS(ABS_MAX):
+		EVDEV_LOCK(evdev);
+		memcpy(&evdev->ev_absinfo[cmd - EVIOCSABS(0)], data,
+		    sizeof(struct input_absinfo));
+		EVDEV_UNLOCK(evdev);
 		break;
 
 	case EVIOCGRAB:
@@ -498,32 +507,14 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		memcpy(data, evdev->ev_sw_states, limit);
 		break;
 
-	}
-
-	if (IOCGROUP(cmd) != 'E')
-		return (EINVAL);
-
-	/* Handle EVIOCGBIT variants */
-	if (num >= IOCNUM(EVIOCGBIT(0, 0)) &&
-	    num < IOCNUM(EVIOCGBIT(EV_MAX, 0))) {
-		int type_num = num - IOCNUM(EVIOCGBIT(0, 0));
+	case EVIOCGBIT(0, 0) ... EVIOCGBIT(EV_MAX, 0):
+		type_num = IOCBASECMD(cmd) - EVIOCGBIT(0, 0);
 		debugf("cdev: EVIOCGBIT(%d): data=%p, len=%d", type_num, data, len);
 		return (evdev_ioctl_eviocgbit(evdev, type_num, len, data));
 	}
 
-	/* Handle EVIOCGABS variants */
-	if (num >= IOCNUM(EVIOCGABS(0)) && num < IOCNUM(EVIOCGABS(ABS_CNT))) {
-		int index = num - IOCNUM(EVIOCGABS(0));
-		memcpy(data, &evdev->ev_absinfo[index], len);
-	}
-
-	/* Handle EVIOCSABS variants */
-	if (num >= IOCNUM(EVIOCSABS(0)) && num < IOCNUM(EVIOCSABS(ABS_CNT))) {
-		int index = num - IOCNUM(EVIOCSABS(0));
-		EVDEV_LOCK(evdev);
-		memcpy(&evdev->ev_absinfo[index], data, len);
-		EVDEV_UNLOCK(evdev);
-	}
+	if (IOCGROUP(cmd) != 'E')
+		return (EINVAL);
 
 	return (0);
 }
