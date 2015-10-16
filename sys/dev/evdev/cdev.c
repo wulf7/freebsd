@@ -370,7 +370,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	/* evdev ioctls handling */
 	switch (cmd) {
 	case IOCBASECMD(EVIOCGVERSION):
-		data = (caddr_t)EV_VERSION;
+		*(int *)data = EV_VERSION;
 		break;
 
 	case IOCBASECMD(EVIOCGID):
