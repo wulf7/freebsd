@@ -122,7 +122,7 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	if (dev != NULL)
 		strlcpy(evdev->ev_shortname, device_get_nameunit(dev), NAMELEN);
 	
-	if (evdev->ev_repeat_mode == EVDEV_REPEAT) {
+	if (evdev_event_supported(evdev, EV_REP) && !evdev->ev_rep_driver) {
 		/* Initialize callout */
 		callout_init(&evdev->ev_rep_callout, 1);
 
@@ -294,10 +294,22 @@ evdev_support_repeat(struct evdev_dev *evdev, enum evdev_repeat_mode mode)
 {
 
 	if (mode != NO_REPEAT)
-		set_bit(evdev->ev_type_flags, EV_REP);
+		evdev_support_event(evdev, EV_REP);
 
-	evdev->ev_repeat_mode = mode;
+	if (mode == DRIVER_REPEAT)
+		evdev->ev_rep_driver = true;
+
 	return (0);
+}
+
+bool
+evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
+{
+
+	if (type >= EV_CNT)
+		return (false);
+
+	return (get_bit(evdev->ev_type_flags, type));
 }
 
 
@@ -378,7 +390,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		/* Detect key repeats. */
 		if (get_bit(evdev->ev_key_states, code) &&
 		    value != KEY_EVENT_UP) {
-			if (evdev->ev_repeat_mode != DRIVER_REPEAT)
+			if (!get_bit(evdev->ev_type_flags, EV_REP))
 				return (0);
 			value = KEY_EVENT_REPEAT;
 		} else

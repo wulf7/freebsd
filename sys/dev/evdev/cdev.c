@@ -377,7 +377,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGREP:
-		if (evdev->ev_repeat_mode == NO_REPEAT)
+		if (!evdev_event_supported(evdev, EV_REP))
 			return (ENOTSUP);
 
 		rep_params[0] = evdev->ev_rep[REP_DELAY];
@@ -386,14 +386,14 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCSREP:
-		if (evdev->ev_repeat_mode == NO_REPEAT)
+		if (!evdev_event_supported(evdev, EV_REP))
 			return (ENOTSUP);
 
 		memcpy(rep_params, data, sizeof(rep_params));
 		evdev->ev_rep[REP_DELAY] = rep_params[0];
 		evdev->ev_rep[REP_PERIOD] = rep_params[1];
 
-		if (evdev->ev_repeat_mode == DRIVER_REPEAT) {
+		if (evdev->ev_rep_driver) {
 			evdev_inject_event(evdev, EV_REP, REP_DELAY, rep_params[0]);
 			evdev_inject_event(evdev, EV_REP, REP_PERIOD, rep_params[1]);
 		}

@@ -93,7 +93,6 @@ struct evdev_dev
 	struct mtx		ev_mtx;
 	struct input_id		ev_id;
 	bool			ev_grabbed;
-	enum evdev_repeat_mode	ev_repeat_mode;
 
 	/* Supported features: */
 	unsigned long		ev_type_flags[nlongs(EV_CNT)];
@@ -109,6 +108,7 @@ struct evdev_dev
 	/* Repeat parameters & callout: */
 	int			ev_rep[REP_CNT];
 	struct callout		ev_rep_callout;
+	bool			ev_rep_driver;
 
 	/* State: */
 	unsigned long		ev_key_states[nlongs(KEY_CNT)];
@@ -186,6 +186,7 @@ int evdev_support_led(struct evdev_dev *, uint16_t);
 int evdev_support_snd(struct evdev_dev *, uint16_t);
 int evdev_support_sw(struct evdev_dev *, uint16_t);
 int evdev_support_repeat(struct evdev_dev *, enum evdev_repeat_mode);
+bool evdev_event_supported(struct evdev_dev *, uint16_t);
 void evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
 void evdev_set_repeat_params(struct evdev_dev *, uint16_t, int);
 
