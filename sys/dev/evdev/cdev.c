@@ -229,7 +229,7 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 		return (ret);
 
 	if (state->ecs_revoked)
-		return (EPERM);
+		return (ENODEV);
 
 	if (uio->uio_resid % sizeof(struct input_event) != 0) {
 		debugf("write size not multiple of struct input_event size");
@@ -281,6 +281,9 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	ret = devfs_get_cdevpriv((void **)&state);
 	if (ret != 0)
 		return (ret);
+
+	if (state->ecs_revoked)
+		return (ENODEV);
 
 	switch(kn->kn_filter) {
 	case EVFILT_READ:
@@ -338,7 +341,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (ret);
 
 	if (state->ecs_revoked)
-		return (EPERM);
+		return (ENODEV);
 
 	/* file I/O ioctl handling */
 	switch (cmd) {
