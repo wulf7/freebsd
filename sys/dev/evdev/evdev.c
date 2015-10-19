@@ -449,6 +449,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	}
 
 	/* Propagate event through all clients */
+	EVDEV_LOCK(evdev);
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		if (!client->ec_enabled)
 			continue;
@@ -464,6 +465,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			client->ec_ev_notify(client, client->ec_ev_arg);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
+	EVDEV_UNLOCK(evdev);
 
 	if  (evdev->postponed_mt_slot != -1) {
 		evdev->last_reported_mt_slot = evdev->postponed_mt_slot;
@@ -525,6 +527,7 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 
 	debugf("adding new client for device %s", evdev->ev_shortname);
 
+	EVDEV_LOCK(evdev);
 	if (evdev->ev_clients_count == 0 && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_open != NULL) {
 		debugf("calling ev_open() on device %s", evdev->ev_shortname);
@@ -533,6 +536,7 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 
 	LIST_INSERT_HEAD(&evdev->ev_clients, client, ec_link);
 	evdev->ev_clients_count++;
+	EVDEV_UNLOCK(evdev);
 	*clientp = client;
 	return (0);
 }
@@ -544,6 +548,7 @@ evdev_dispose_client(struct evdev_client *client)
 
 	debugf("removing client for device %s", evdev->ev_shortname);
 
+	EVDEV_LOCK(evdev);
 	evdev->ev_clients_count--;
 
 	if (evdev->ev_clients_count == 0 && evdev->ev_methods != NULL &&
@@ -551,6 +556,7 @@ evdev_dispose_client(struct evdev_client *client)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
 
 	LIST_REMOVE(client, ec_link);
+	EVDEV_UNLOCK(evdev);
 	free(client, M_EVDEV);
 	return (0);
 }
