@@ -461,7 +461,8 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			    EV_ABS, ABS_MT_SLOT, evdev->postponed_mt_slot);
 		evdev_client_push(client, type, code, value);
 
-		if (client->ec_ev_notify != NULL)
+		if (client->ec_ev_notify != NULL &&
+		    type == EV_SYN && code == SYN_REPORT)
 			client->ec_ev_notify(client, client->ec_ev_arg);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
@@ -523,6 +524,7 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 	client->ec_buffer_size = ec_buffer_size;
 	client->ec_buffer_head = 0;
 	client->ec_buffer_tail = 0;
+	client->ec_buffer_ready = 0;
 	client->ec_enabled = true;
 
 	debugf("adding new client for device %s", evdev->ev_shortname);
@@ -665,63 +667,81 @@ evdev_stop_repeat(struct evdev_dev *dev)
 #endif
 
 static void
-evdev_set_event_time(struct evdev_client *client, struct input_event *ie)
+evdev_client_gettime(struct evdev_client *client, struct timeval *tv)
 {
 
 	if (client->ec_clock_id == EV_CLOCK_MONOTONIC)
-		microuptime(&ie->time);
+		microuptime(tv);
 	else
-		microtime(&ie->time);
+		microtime(tv);
 }
 
 static void
 evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
     int32_t value)
 {
-	size_t count, head, tail;
+	struct timeval time;
+	size_t count, head, tail, ready;
 	
 	EVDEV_CLIENT_LOCKQ_ASSERT(client);
 	head = client->ec_buffer_head;
 	tail = client->ec_buffer_tail;
+	ready = client->ec_buffer_ready;
 	count = client->ec_buffer_size;
 
-	/* If queue is full, overwrite last element with SYN_DROPPED event */
+	/* If queue is full drop its content and place SYN_DROPPED event */
 	if ((tail + 1) % count == head) {
 		debugf("client %p for device %s: buffer overflow", client,
 		    client->ec_evdev->ev_shortname);
 
-		/* Check whether we placed SYN_DROPPED packet already */
-		if (client->ec_buffer[tail - 2 % count].type == EV_SYN &&
-		    client->ec_buffer[tail - 2 % count].code == SYN_DROPPED) {
-			return;
-		}
-
-		evdev_set_event_time(client, &client->ec_buffer[tail - 1]);
-		client->ec_buffer[tail - 1].type = EV_SYN;
-		client->ec_buffer[tail - 1].code = SYN_DROPPED;
-		return;
+		head = (tail + count - 1) % count;
+		client->ec_buffer[head] = (struct input_event) {
+			.type = EV_SYN,
+			.code = SYN_DROPPED,
+			.value = 0
+		};
+		/*
+		 * XXX: Here is a small race window from now till the end of
+		 *      report. The queue is empty but client has been already
+		 *      notified of data readyness. Can be fixed in two ways:
+		 * 1. Implement bulk insert so queue lock would not be dropped
+		 *    till the SYN_REPORT event.
+		 * 2. Insert SYN_REPORT just now and skip remaining events
+		 */
+		client->ec_buffer_head = head;
+		client->ec_buffer_ready = head;
 	}
 
-	evdev_set_event_time(client, &client->ec_buffer[tail]);
 	client->ec_buffer[tail].type = type;
 	client->ec_buffer[tail].code = code;
 	client->ec_buffer[tail].value = value;
 	client->ec_buffer_tail = (tail + 1) % count;
+
+	/* Allow users to read events only after report has been completed */
+	if (type == EV_SYN && code == SYN_REPORT) {
+		evdev_client_gettime(client, &time);
+		for (; ready != client->ec_buffer_tail;
+		     ready = (ready + 1) % count)
+			client->ec_buffer[ready].time = time;
+		client->ec_buffer_ready = client->ec_buffer_tail;
+	}
 }
 
 void
 evdev_client_dumpqueue(struct evdev_client *client)
 {
 	struct input_event *event;
-	size_t i, head, tail, size;
+	size_t i, head, tail, ready, size;
 
 	head = client->ec_buffer_head;
 	tail = client->ec_buffer_tail;
+	ready = client->ec_buffer_ready;
 	size = client->ec_buffer_size;
 
 	printf("evdev client: %p\n", client);
 	printf("evdev provider name: %s\n", client->ec_evdev->ev_name);
-	printf("event queue: head=%zu tail=%zu size=%zu\n", tail, head, size);
+	printf("event queue: head=%zu ready=%zu tail=%zu size=%zu\n",
+	    head, ready, tail, size);
 
 	printf("queue contents:\n");
 
@@ -739,6 +759,8 @@ evdev_client_dumpqueue(struct evdev_client *client)
 			printf("<- head\n");
 		else if (i == tail)
 			printf("<- tail\n");
+		else if (i == ready)
+			printf("<- ready\n");
 		else
 			printf("\n");
 	}
@@ -756,6 +778,7 @@ evdev_client_filter_queue(struct evdev_client *client, uint16_t type)
 	i = head = client->ec_buffer_head;
 	tail = client->ec_buffer_tail;
 	count = client->ec_buffer_size;
+	client->ec_buffer_ready = client->ec_buffer_tail;
 
 	while (i != client->ec_buffer_tail) {
 		event = &client->ec_buffer[i];
@@ -766,9 +789,12 @@ evdev_client_filter_queue(struct evdev_client *client, uint16_t type)
 			continue;
 
 		/* Remove empty SYN_REPORT events */
-		if (event->type == EV_SYN && event->code == SYN_REPORT &&
-		    last_was_syn)
-			continue;
+		if (event->type == EV_SYN && event->code == SYN_REPORT) {
+			if (last_was_syn)
+				continue;
+			else
+				client->ec_buffer_ready = (tail + 1) % count;
+		}
 
 		/* Rewrite entry */
 		memcpy(&client->ec_buffer[tail], event,

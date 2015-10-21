@@ -150,6 +150,7 @@ struct evdev_client
 	size_t			ec_buffer_size;
 	size_t			ec_buffer_head;
 	size_t			ec_buffer_tail;
+	size_t			ec_buffer_ready;
 	bool			ec_enabled;
 	bool			ec_stall;
 	enum evdev_clock_id	ec_clock_id;
@@ -167,7 +168,7 @@ struct evdev_client
 #define EVDEV_CLIENT_LOCKQ_ASSERT(client) \
     mtx_assert(&(client)->ec_buffer_mtx, MA_OWNED)
 #define	EVDEV_CLIENT_EMPTYQ(client) \
-    ((client)->ec_buffer_head == (client)->ec_buffer_tail)
+    ((client)->ec_buffer_head == (client)->ec_buffer_ready)
 
 /* Input device interface: */
 struct evdev_dev *evdev_alloc(void);
