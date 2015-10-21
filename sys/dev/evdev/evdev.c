@@ -129,8 +129,8 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 		if (evdev->ev_rep[REP_DELAY] == 0 &&
 		    evdev->ev_rep[REP_PERIOD] == 0) {
 			/* Supply default values */
-			evdev->ev_rep[REP_DELAY] = 300;
-			evdev->ev_rep[REP_PERIOD] = 50;
+			evdev->ev_rep[REP_DELAY] = 250;
+			evdev->ev_rep[REP_PERIOD] = 33;
 		}
 	}
 
