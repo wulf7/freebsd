@@ -270,7 +270,11 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		break;
 
 	case UI_SET_EVBIT:
-		evdev_support_event(state->ucs_evdev, (uint16_t)*(int *)data);
+		if (*(int *)data == EV_REP)
+			evdev_support_repeat(state->ucs_evdev,
+			    EVDEV_REPEAT);
+		else
+			evdev_support_event(state->ucs_evdev, *(int *)data);
 		break;
 
 	case UI_SET_KEYBIT:
