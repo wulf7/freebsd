@@ -504,8 +504,8 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGPROP(0):
-		limit = MIN(len, howmany(EV_CNT, 8));
-		memcpy(data, evdev->ev_type_flags, limit);
+		limit = MIN(len, howmany(INPUT_PROP_CNT, 8));
+		memcpy(data, evdev->ev_prop_flags, limit);
 		return (0);
 
 	case EVIOCGMTSLOTS(0):

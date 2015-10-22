@@ -318,6 +318,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		break;
 
 	case UI_SET_PROPBIT:
+		evdev_support_prop(state->ucs_evdev, *(int *)data);
 		break;
 
 	case UI_GET_VERSION:

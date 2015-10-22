@@ -214,6 +214,17 @@ evdev_set_softc(struct evdev_dev *evdev, void *softc)
 }
 
 inline int
+evdev_support_prop(struct evdev_dev *evdev, uint16_t prop)
+{
+
+	if (prop >= INPUT_PROP_CNT)
+		return (EINVAL);
+
+	set_bit(evdev->ev_prop_flags, prop);
+	return (0);
+}
+
+inline int
 evdev_support_event(struct evdev_dev *evdev, uint16_t type)
 {
 

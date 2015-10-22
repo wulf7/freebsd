@@ -202,6 +202,7 @@ utouch_attach(device_t dev)
 	evdev_set_serial(sc->sc_evdev, "0");
 	evdev_set_softc(sc->sc_evdev, sc);
 	evdev_set_methods(sc->sc_evdev, &utouch_evdev_methods);
+	evdev_support_prop(sc->sc_evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
 	evdev_support_event(sc->sc_evdev, EV_ABS);
 	evdev_support_event(sc->sc_evdev, EV_REL);

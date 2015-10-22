@@ -102,6 +102,7 @@ struct evdev_dev
 	bool			ev_running;
 
 	/* Supported features: */
+	unsigned long		ev_prop_flags[nlongs(INPUT_PROP_CNT)];
 	unsigned long		ev_type_flags[nlongs(EV_CNT)];
 	unsigned long		ev_key_flags[nlongs(KEY_CNT)];
 	unsigned long		ev_rel_flags[nlongs(REL_CNT)];
@@ -186,6 +187,7 @@ int evdev_sync(struct evdev_dev *);
 int evdev_mt_sync(struct evdev_dev *);
 int evdev_cdev_create(struct evdev_dev *);
 int evdev_cdev_destroy(struct evdev_dev *);
+int evdev_support_prop(struct evdev_dev *, uint16_t);
 int evdev_support_event(struct evdev_dev *, uint16_t);
 int evdev_support_key(struct evdev_dev *, uint16_t);
 int evdev_support_rel(struct evdev_dev *, uint16_t);

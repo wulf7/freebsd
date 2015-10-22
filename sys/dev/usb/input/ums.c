@@ -695,6 +695,7 @@ ums_attach(device_t dev)
 	evdev_set_serial(sc->sc_evdev, "0");
 	evdev_set_softc(sc->sc_evdev, sc);
 	evdev_set_methods(sc->sc_evdev, &ums_evdev_methods);
+	evdev_support_prop(sc->sc_evdev, INPUT_PROP_POINTER);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
 	evdev_support_event(sc->sc_evdev, EV_REL);
 	evdev_support_event(sc->sc_evdev, EV_KEY);
