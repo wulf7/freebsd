@@ -57,6 +57,7 @@ typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 #define	ABS_IS_MT(x)	((x) >= ABS_MT_FIRST && (x) <= ABS_MT_LAST)
 #define	ABS_MT_INDEX(x)	((x) - ABS_MT_FIRST)
 #define	MT_CNT		(ABS_MT_INDEX(ABS_MT_LAST) + 1)
+#define	CURRENT_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].value)
 
 enum evdev_repeat_mode
 {
@@ -125,9 +126,7 @@ struct evdev_dev
 	unsigned long		ev_sw_states[nlongs(SW_CNT)];
 
 	/* Multitouch protocol type B state: */
-	int32_t			current_mt_slot;
 	int32_t			last_reported_mt_slot;
-	int32_t			postponed_mt_slot;
 	int32_t			ev_mt_states[MAX_MT_SLOTS][MT_CNT];
 	int			events_since_last_syn;
 

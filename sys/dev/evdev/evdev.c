@@ -138,9 +138,6 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	evdev_assign_id(evdev);
 
 	/* Initialize multitouch protocol type B states */
-	evdev->current_mt_slot = -1;
-	evdev->last_reported_mt_slot = -1;
-	evdev->postponed_mt_slot = -1;
 	for (i = 0; i < MAX_MT_SLOTS; i++)
 		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 
@@ -402,6 +399,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 	struct evdev_client *client;
+	int32_t postponed_mt_slot = -1;
 
 	if (evdev_check_event(evdev, type, code, value) != 0)
 		return (EINVAL);
@@ -435,23 +433,26 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		evdev->ev_absinfo[code].value = value;
 		/* Don`t repeat MT protocol type B events */
 		if (code == ABS_MT_SLOT) {
-			evdev->current_mt_slot = value;
 			/* Postpone ABS_MT_SLOT till next event */
-			evdev->postponed_mt_slot = value;
+			evdev->last_reported_mt_slot = value;
 			return (0);
 		} else if (ABS_IS_MT(code)) {
-			if (evdev->ev_mt_states[evdev->current_mt_slot]
+			if (evdev->ev_mt_states[evdev->last_reported_mt_slot]
 			    [ABS_MT_INDEX(code)] == value)
 				return (0);
-			else
-				evdev->ev_mt_states[evdev->current_mt_slot]
-				    [ABS_MT_INDEX(code)] = value;
+			evdev->ev_mt_states[evdev->last_reported_mt_slot]
+			    [ABS_MT_INDEX(code)] = value;
+			if (evdev->last_reported_mt_slot !=
+			    CURRENT_MT_SLOT(evdev)) {
+				CURRENT_MT_SLOT(evdev) =
+				    evdev->last_reported_mt_slot;
+				postponed_mt_slot = CURRENT_MT_SLOT(evdev);
+			}
 		}
 	}
 
 	/* Skip empty reports */
-	if (type == EV_SYN) {
-		evdev->postponed_mt_slot = -1;
+	if (type == EV_SYN && code == SYN_REPORT) {
 		if (evdev->events_since_last_syn == 0)
 			return (0);
 		evdev->events_since_last_syn = 0;
@@ -467,9 +468,9 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 		EVDEV_CLIENT_LOCKQ(client);
 		/* report postponed ABS_MT_SLOT */
-		if (evdev->postponed_mt_slot != -1)
+		if (postponed_mt_slot != -1)
 			evdev_client_push(client,
-			    EV_ABS, ABS_MT_SLOT, evdev->postponed_mt_slot);
+			    EV_ABS, ABS_MT_SLOT, postponed_mt_slot);
 		evdev_client_push(client, type, code, value);
 
 		if (client->ec_ev_notify != NULL &&
@@ -478,11 +479,6 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 	EVDEV_UNLOCK(evdev);
-
-	if  (evdev->postponed_mt_slot != -1) {
-		evdev->last_reported_mt_slot = evdev->postponed_mt_slot;
-		evdev->postponed_mt_slot = -1;
-	}
 
 	return (0);
 }
