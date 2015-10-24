@@ -407,36 +407,52 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	debugf("%s pushed event %d/%d/%d",
 	    evdev->ev_shortname, type, code, value);
 
-	/* For certain event types, update device state bits */
-	if (type == EV_KEY) {
-		/* Detect key repeats. */
-		if (get_bit(evdev->ev_key_states, code) &&
-		    value != KEY_EVENT_UP) {
-			if (!get_bit(evdev->ev_type_flags, EV_REP))
+	/*
+	 * For certain event types, update device state bits
+	 * and convert level reporting to edge reporting
+	 */
+	switch (type) {
+	case EV_KEY:
+		if (get_bit(evdev->ev_key_states, code) ==
+		    (value != KEY_EVENT_UP)) {
+			/* Detect key repeats. */
+			if (get_bit(evdev->ev_type_flags, EV_REP)
+			    && value != KEY_EVENT_UP)
+				value = KEY_EVENT_REPEAT;
+			else
 				return (0);
-			value = KEY_EVENT_REPEAT;
 		} else
 			change_bit(evdev->ev_key_states, code, value);
-	}
+		break;
 
-	if (type == EV_LED)
+	case EV_LED:
+		if (get_bit(evdev->ev_led_states, code) == value)
+			return (0);
 		change_bit(evdev->ev_led_states, code, value);
+		break;
 
-	if (type == EV_SND)
+	case EV_SND:
+		if (get_bit(evdev->ev_snd_states, code) == value)
+			return (0);
 		change_bit(evdev->ev_snd_states, code, value);
+		break;
 
-	if (type == EV_SW)
+	case EV_SW:
+		if (get_bit(evdev->ev_sw_states, code) == value)
+			return (0);
 		change_bit(evdev->ev_sw_states, code, value);
+		break;
 
-	/* For EV_ABS, save last value in absinfo */
-	if (type == EV_ABS) {
-		evdev->ev_absinfo[code].value = value;
-		/* Don`t repeat MT protocol type B events */
-		if (code == ABS_MT_SLOT) {
+	/* For EV_ABS, save last value in absinfo and ev_mt_states */
+	case EV_ABS:
+		switch (code) {
+		case ABS_MT_SLOT:
 			/* Postpone ABS_MT_SLOT till next event */
 			evdev->last_reported_mt_slot = value;
 			return (0);
-		} else if (ABS_IS_MT(code)) {
+
+		case ABS_MT_FIRST ... ABS_MT_LAST:
+			/* Don`t repeat MT protocol type B events */
 			if (evdev->ev_mt_states[evdev->last_reported_mt_slot]
 			    [ABS_MT_INDEX(code)] == value)
 				return (0);
@@ -448,7 +464,15 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 				    evdev->last_reported_mt_slot;
 				postponed_mt_slot = CURRENT_MT_SLOT(evdev);
 			}
+			break;
+
+		default:
+			/* XXX: Do we need MT protocol type A handling ??? */
+			if (evdev->ev_absinfo[code].value == value)
+				return (0);
+			evdev->ev_absinfo[code].value = value;
 		}
+		break;
 	}
 
 	/* Skip empty reports */
