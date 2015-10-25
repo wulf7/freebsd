@@ -185,6 +185,17 @@ static uint16_t evdev_at_set1_scancodes[] = {
 	NONE,		NONE,		NONE,		NONE,
 };
 
+static uint16_t evdev_mouse_button_codes[] = {
+	BTN_LEFT,
+	BTN_MIDDLE,
+	BTN_RIGHT,
+	BTN_SIDE,
+	BTN_EXTRA,
+	BTN_FORWARD,
+	BTN_BACK,
+	BTN_TASK,
+};
+
 
 inline uint16_t
 evdev_hid2key(int scancode)
@@ -243,4 +254,14 @@ evdev_scancode2key(int *state, int scancode)
 	}
 
 	return (keycode);
+}
+
+void
+evdev_push_mouse_btn(struct evdev_dev *evdev, int buttons)
+{
+	size_t i;
+
+	for (i = 0; i < nitems(evdev_mouse_button_codes); i++)
+		evdev_push_event(evdev, EV_KEY, evdev_mouse_button_codes[i],
+		    (buttons & (1 << i)) != 0);
 }

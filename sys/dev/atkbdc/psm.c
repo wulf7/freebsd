@@ -577,17 +577,6 @@ static struct evdev_methods psm_ev_methods = {
 	.ev_open = &psm_ev_open,
 	.ev_close = &psm_ev_close,
 };
-
-static uint16_t evdev_btnmap[] = {
-	BTN_LEFT,
-	BTN_MIDDLE,
-	BTN_RIGHT,
-	BTN_SIDE,
-	BTN_EXTRA,
-	BTN_FORWARD,
-	BTN_BACK,
-	BTN_TASK,
-};
 #endif
 
 /* device I/O routines */
@@ -3809,20 +3798,7 @@ psmsoftintr(void *arg)
 			}
 		}
 
-		if (ms.obutton ^ ms.button) {
-			int i;
-
-			for (i = 0; i < 8; i++) {
-				if (((ms.button & (1 << i)) ^
-				    (ms.obutton & (1 << i))) == 0)
-					continue;
-
-				evdev_push_event(sc->evdev, EV_KEY,
-				    evdev_btnmap[i], !!(ms.button & (1 << i)));
-
-			}
-		}
-
+		evdev_push_mouse_btn(sc->evdev, ms.button);
 		evdev_sync(sc->evdev);
 	}
 #endif

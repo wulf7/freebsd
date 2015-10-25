@@ -900,20 +900,11 @@ ums_put_queue(struct ums_softc *sc, int32_t dx, int32_t dy,
 		if (dt != 0)
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_HWHEEL, dt);
 
-		if (buttons != oldbuttons) {
-			int i;
-
-			for (i = 0; i < sc->sc_buttons; i++) {
-				if (((buttons & (1 << UMS_BUT(i))) ^
-				    (oldbuttons & (1 << UMS_BUT(i)))) == 0)
-					continue;
-
-				evdev_push_event(sc->sc_evdev, EV_KEY,
-				    BTN_MOUSE + i,
-				    !!(buttons & (1 << UMS_BUT(i))));
-			}
-		}
-
+		evdev_push_mouse_btn(sc->sc_evdev,
+		    (buttons & ~MOUSE_STDBUTTONS) |
+		    (buttons & (1 << 2) ? MOUSE_BUTTON1DOWN : 0) |
+		    (buttons & (1 << 1) ? MOUSE_BUTTON2DOWN : 0) |
+		    (buttons & (1 << 0) ? MOUSE_BUTTON3DOWN : 0));
 		evdev_sync(sc->sc_evdev);
 #endif
 	} else {
