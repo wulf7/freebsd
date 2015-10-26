@@ -259,7 +259,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		evdev_set_softc(state->ucs_evdev, state);
 		evdev_register(NULL, state->ucs_evdev);
 		state->ucs_connected = true;
-		break;
+		return (0);
 
 	case UI_DEV_DESTROY:
 		if (!state->ucs_connected)
@@ -267,39 +267,37 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		evdev_unregister(NULL, state->ucs_evdev);
 		state->ucs_connected = false;
-		break;
+		return (0);
 
 	case UI_SET_EVBIT:
 		if (*(int *)data == EV_REP)
-			evdev_support_repeat(state->ucs_evdev,
-			    EVDEV_REPEAT);
+			return (evdev_support_repeat(state->ucs_evdev,
+			    EVDEV_REPEAT));
 		else
-			evdev_support_event(state->ucs_evdev, *(int *)data);
-		break;
+			return (evdev_support_event(state->ucs_evdev,
+			    *(int *)data));
 
 	case UI_SET_KEYBIT:
-		evdev_support_key(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_key(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_RELBIT:
-		evdev_support_rel(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_rel(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_ABSBIT:
-		evdev_support_abs(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_abs(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_MSCBIT:
-		evdev_support_msc(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_msc(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_LEDBIT:
-		evdev_support_led(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_led(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_SNDBIT:
-		evdev_support_snd(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_snd(state->ucs_evdev, *(int *)data));
+
+	case UI_SET_FFBIT:
+		/* Fake unsupported ioctl */
+		return (0);
 
 	case UI_SET_PHYS:
 		if (state->ucs_connected)
@@ -311,22 +309,27 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (ret != 0)
 			return (ret);
 		evdev_set_phys(state->ucs_evdev, buf);
-		break;
+		return (0);
 
 	case UI_SET_SWBIT:
-		evdev_support_sw(state->ucs_evdev, (uint16_t)*(int *)data);
-		break;
+		return (evdev_support_sw(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_PROPBIT:
-		evdev_support_prop(state->ucs_evdev, *(int *)data);
-		break;
+		return (evdev_support_prop(state->ucs_evdev, *(int *)data));
+
+	case UI_BEGIN_FF_UPLOAD:
+	case UI_END_FF_UPLOAD:
+	case UI_BEGIN_FF_ERASE:
+	case UI_END_FF_ERASE:
+		/* Fake unsupported ioctl */
+		return (0);
 
 	case UI_GET_VERSION:
 		*(unsigned int *)data = UINPUT_VERSION;
-		break;
+		return (0);
 	}
-	
-	return (0);
+
+	return (EINVAL);
 }
 
 static int
