@@ -79,6 +79,11 @@ enum evdev_clock_id
 	EV_CLOCK_MONOTONIC
 };
 
+#define	PS2_KEYBOARD_VENDOR		1
+#define	PS2_KEYBOARD_PRODUCT		1
+#define	PS2_MOUSE_VENDOR		2
+#define	PS2_MOUSE_GENERIC_PRODUCT	1
+
 struct evdev_methods
 {
 	evdev_open_t		*ev_open;

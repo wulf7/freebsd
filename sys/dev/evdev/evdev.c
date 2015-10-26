@@ -648,6 +648,9 @@ evdev_assign_id(struct evdev_dev *dev)
 	devclass_t devclass;
 	const char *classname;
 
+	if (dev->ev_id.bustype != 0)
+		return;
+
 	if (dev->ev_dev == NULL) {
 		dev->ev_id.bustype = BUS_VIRTUAL;
 		return;
@@ -677,6 +680,20 @@ evdev_assign_id(struct evdev_dev *dev)
 		dev->ev_id.bustype = BUS_USB;
 		dev->ev_id.vendor = uaa->info.idVendor;
 		dev->ev_id.product = uaa->info.idProduct;
+		return;
+	}
+
+	if (strcmp(classname, "atkbdc") == 0) {
+		devclass = device_get_devclass(dev->ev_dev);
+		classname = devclass_get_name(devclass);
+		dev->ev_id.bustype = BUS_I8042;
+		if (strcmp(classname, "atkbd") == 0) {
+			dev->ev_id.vendor = PS2_KEYBOARD_VENDOR;
+			dev->ev_id.product = PS2_KEYBOARD_PRODUCT;
+		} else if (strcmp(classname, "psm") == 0) {
+			dev->ev_id.vendor = PS2_MOUSE_VENDOR;
+			dev->ev_id.product = PS2_MOUSE_GENERIC_PRODUCT;
+		}
 		return;
 	}
 
