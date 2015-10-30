@@ -106,6 +106,7 @@ struct evdev_dev
 	struct input_id		ev_id;
 	bool			ev_grabbed;
 	bool			ev_running;
+	size_t			ev_report_size;
 
 	/* Supported features: */
 	unsigned long		ev_prop_flags[nlongs(INPUT_PROP_CNT)];
@@ -204,6 +205,7 @@ int evdev_support_repeat(struct evdev_dev *, enum evdev_repeat_mode);
 bool evdev_event_supported(struct evdev_dev *, uint16_t);
 void evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
 void evdev_set_repeat_params(struct evdev_dev *, uint16_t, int);
+int evdev_set_report_size(struct evdev_dev *, size_t);
 
 /* Client interface: */
 int evdev_register_client(struct evdev_dev *, struct evdev_client **);

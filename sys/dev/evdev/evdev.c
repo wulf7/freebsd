@@ -48,7 +48,7 @@
 #define	debugf(fmt, args...)
 #endif
 
-#define	DEF_RING_SIZE	16
+#define	DEF_RING_REPORTS	8
 
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
@@ -107,6 +107,84 @@ evdev_free(struct evdev_dev *evdev)
 }
 
 int
+evdev_set_report_size(struct evdev_dev *evdev, size_t report_size)
+{
+	if (report_size > KEY_CNT + REL_CNT + ABS_CNT + MAX_MT_SLOTS * MT_CNT +
+	    MSC_CNT + LED_CNT + SND_CNT + SW_CNT + FF_CNT)
+		return (EINVAL);
+
+	evdev->ev_report_size = report_size;
+	return (0);
+}
+
+static size_t
+evdev_estimate_report_size(struct evdev_dev *evdev)
+{
+	size_t size = 0;
+	int16_t i;
+	unsigned long type_detected;
+
+	/*
+	 * Keyboards generate one event per report but other devices with
+	 * buttons like mouses can report events simultaneously
+	 */
+	type_detected = 0;
+	for (i = 0; i < KEY_CNT; i++) {
+		if (get_bit(evdev->ev_key_flags, i)) {
+			if (i >= BTN_MISC && i < KEY_OK)
+				size++;
+			else
+				type_detected = 1;
+		}
+	}
+	size += (type_detected != 0);
+
+	/* All relative axes can be reported simultaneously */
+	for (i = 0; i < REL_CNT; i++)
+		if (get_bit(evdev->ev_rel_flags, i))
+			size++;
+
+	/*
+	 * All absolute axes can be reported simultaneously.
+	 * Multitouch axes can be reported ABS_MT_SLOT times
+	 */
+	for (i = 0; i < ABS_CNT; i++) {
+		if (get_bit(evdev->ev_abs_flags, i)) {
+			if (ABS_IS_MT(i) || i == ABS_MT_SLOT)
+				size += MAX_MT_SLOTS;
+			else
+				size++;
+		}
+	}
+
+	/* Assume other events are generated once per report */
+	type_detected = 0;
+	for (i = 0; i < nlongs(MSC_CNT); i++)
+		type_detected |= evdev->ev_msc_flags[i];
+	size += (type_detected != 0);
+
+	type_detected = 0;
+	for (i = 0; i < nlongs(LED_CNT); i++)
+		type_detected |= evdev->ev_led_flags[i];
+	size += (type_detected != 0);
+
+	type_detected = 0;
+	for (i = 0; i < nlongs(SND_CNT); i++)
+		type_detected |= evdev->ev_snd_flags[i];
+	size += (type_detected != 0);
+
+	type_detected = 0;
+	for (i = 0; i < nlongs(SW_CNT); i++)
+		type_detected |= evdev->ev_sw_flags[i];
+	size += (type_detected != 0);
+
+	/* XXX: FF part is not implemented yet */
+
+	size++;		/* SYN_REPORT */
+	return (size);
+}
+
+int
 evdev_register(device_t dev, struct evdev_dev *evdev)
 {
 	int ret, i;
@@ -141,9 +219,18 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	for (i = 0; i < MAX_MT_SLOTS; i++)
 		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 
+	/* Estimate maximum report size */
+	if (evdev->ev_report_size == 0) {
+		ret = evdev_set_report_size(evdev,
+		    evdev_estimate_report_size(evdev));
+		if (ret != 0)
+			goto bail_out;
+	}
+
 	/* Create char device node */
 	evdev->ev_running = true;
 	ret = evdev_cdev_create(evdev);
+bail_out:
 	if (ret != 0)
 		mtx_destroy(&evdev->ev_mtx);
 
@@ -350,13 +437,6 @@ evdev_set_repeat_params(struct evdev_dev *evdev, uint16_t property, int value)
 	evdev->ev_rep[property] = value;
 }
 
-static inline bool
-evdev_is_mt(struct evdev_dev *evdev)
-{
-
-	return (get_bit(evdev->ev_abs_flags, ABS_MT_SLOT));
-}
-
 static int
 evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
@@ -539,20 +619,18 @@ int
 evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 {
 	struct evdev_client *client;
-	size_t ec_buffer_size;
-
-	ec_buffer_size =
-	    evdev_is_mt(evdev) ? DEF_RING_SIZE * MAX_MT_SLOTS : DEF_RING_SIZE;
+	size_t buffer_size;
 
 	/* Initialize client structure */
+	buffer_size = evdev->ev_report_size * DEF_RING_REPORTS;
 	client = malloc(offsetof(struct evdev_client, ec_buffer) +
-	    sizeof(struct input_event) * ec_buffer_size,
+	    sizeof(struct input_event) * buffer_size,
 	    M_EVDEV, M_WAITOK | M_ZERO);
 	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
 	client->ec_evdev = evdev;
 
 	/* Initialize ring buffer */
-	client->ec_buffer_size = ec_buffer_size;
+	client->ec_buffer_size = buffer_size;
 	client->ec_buffer_head = 0;
 	client->ec_buffer_tail = 0;
 	client->ec_buffer_ready = 0;
