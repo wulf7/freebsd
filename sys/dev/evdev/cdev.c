@@ -180,10 +180,9 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 	client = state->ecs_client;
 
-	if (uio->uio_resid % sizeof(struct input_event) != 0) {
-		debugf("read size not multiple of struct input_event size");
+	/* Zero-sized reads are allowed for error checking */
+	if (uio->uio_resid != 0 && uio->uio_resid < sizeof(struct input_event))
 		return (EINVAL);
-	}
 
 	remaining = uio->uio_resid / sizeof(struct input_event);
 
@@ -195,13 +194,19 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 			return (EWOULDBLOCK);
 		}
 
-		state->ecs_blocked = true;
-		mtx_sleep(client, &client->ec_buffer_mtx, PCATCH, "evrea", 0);
+		if (remaining != 0) {
+			state->ecs_blocked = true;
+			mtx_sleep(client, &client->ec_buffer_mtx, PCATCH,
+			    "evrea", 0);
+		}
 	}
 
 	for (;;) {
 		if (EVDEV_CLIENT_EMPTYQ(client))
 			/* Short read :-( */
+			break;
+
+		if (remaining == 0)
 			break;
 	
 		event = &client->ec_buffer[client->ec_buffer_head];
@@ -211,9 +216,6 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 		EVDEV_CLIENT_UNLOCKQ(client);
 		uiomove(event, sizeof(struct input_event), uio);
 		EVDEV_CLIENT_LOCKQ(client);
-
-		if (remaining == 0)
-			break;
 	}
 
 	EVDEV_CLIENT_UNLOCKQ(client);
