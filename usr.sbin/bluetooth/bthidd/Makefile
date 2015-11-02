@@ -9,7 +9,7 @@ SRCS=		bthidd.c client.c hid.c kbd.c lexer.l parser.y server.c \
 
 CFLAGS+=	-I${.CURDIR}
 
-SRCS+=		uinput.c
+SRCS+=		btuinput.c
 CFLAGS+=	-DUINPUT
 
 LIBADD+=	bluetooth usbhid

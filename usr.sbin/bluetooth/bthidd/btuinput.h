@@ -31,7 +31,7 @@
 
 #include <sys/consio.h>
 
-int uinput_open_mouse  (hid_device_p const d);
-int uinput_report_mouse(int fd, struct mouse_info *mi, int32_t obutt);
+int uinput_create_mouse(bthid_session_p const s);
+int uinput_report_mouse(bthid_session_p s, struct mouse_info *mi);
 
 #endif /* ndef _UINPUT_H_ */

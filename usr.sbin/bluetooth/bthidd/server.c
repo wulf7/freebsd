@@ -48,6 +48,10 @@
 #include "bthidd.h"
 #include "kbd.h"
 
+#ifdef UINPUT
+#include "btuinput.h"
+#endif
+
 #undef	max
 #define	max(x, y)	(((x) > (y))? (x) : (y))
 
@@ -288,6 +292,10 @@ server_accept(bthid_server_p srv, int32_t fd)
 		if (s->vkbd > srv->maxfd)
 			srv->maxfd = s->vkbd;
 	}
+#ifdef UINPUT
+	if (s->state == OPEN && d->mouse && s->uinput != -1)
+		uinput_create_mouse(s);
+#endif
 
 	return (0);
 }

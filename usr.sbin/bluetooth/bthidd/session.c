@@ -47,10 +47,6 @@
 #include "bthidd.h"
 #include "kbd.h"
 
-#ifdef UINPUT
-#include "uinput.h"
-#endif
-
 /*
  * Create new session
  */
@@ -86,18 +82,18 @@ session_open(bthid_server_p srv, hid_device_p const d)
 			return (NULL);
 		}
 	} else {
-#ifdef UINPUT
-		if (d->mouse) {
-			s->uinput = uinput_open_mouse(d);
-			if (s->uinput < 0)
-				syslog(LOG_ERR, "Could not open /dev/uinput " \
-					"for %s. %s (%d)", bt_ntoa(&s->bdaddr,
-					NULL), strerror(errno), errno);
-		}
-#endif
 		s->vkbd = -1;
 	}
 
+#ifdef UINPUT
+	if (d->mouse) {
+		s->uinput = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+		if (s->uinput < 0)
+			syslog(LOG_ERR, "Could not open /dev/uinput " \
+				"for %s. %s (%d)", bt_ntoa(&s->bdaddr,
+				NULL), strerror(errno), errno);
+	}
+#endif
 	s->state = CLOSED;
 
 	s->keys1 = bit_alloc(kbd_maxkey());
