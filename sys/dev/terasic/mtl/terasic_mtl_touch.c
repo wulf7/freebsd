@@ -129,6 +129,7 @@ terasic_mtl_touch_detach(struct terasic_mtl_softc *sc)
 {
 
 	evdev_unregister(sc->mtl_dev, sc->mtl_evdev);
+	evdev_free(sc->mtl_evdev);
 }
 
 static int

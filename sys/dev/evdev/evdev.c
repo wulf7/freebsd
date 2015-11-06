@@ -255,11 +255,12 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 	}
 	EVDEV_UNLOCK(evdev);
 
+	/* destroy_dev can sleep so release lock */
 	ret = evdev_cdev_destroy(evdev);
-	if (ret != 0)
-		return (ret);
+	if (ret == 0)
+		mtx_destroy(&evdev->ev_mtx);
 
-	return (0);
+	return (ret);
 }
 
 inline void
@@ -661,7 +662,6 @@ evdev_dispose_client(struct evdev_client *client)
 
 	EVDEV_LOCK(evdev);
 	evdev->ev_clients_count--;
-
 	if (evdev->ev_clients_count == 0 && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_close != NULL)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);

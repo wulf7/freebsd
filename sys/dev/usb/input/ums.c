@@ -749,6 +749,7 @@ ums_detach(device_t self)
 
 #ifdef EVDEV
 	evdev_unregister(self, sc->sc_evdev);
+	evdev_free(sc->sc_evdev);
 #endif
 
 	usbd_transfer_unsetup(sc->sc_xfer, UMS_N_TRANSFER);

@@ -1391,8 +1391,10 @@ ukbd_detach(device_t dev)
 #endif
 
 #ifdef EVDEV
-	if (sc->sc_flags & UKBD_FLAG_ATTACHED)
+	if (sc->sc_flags & UKBD_FLAG_ATTACHED) {
 		evdev_unregister(dev, sc->sc_evdev);
+		evdev_free(sc->sc_evdev);
+	}
 #endif
 
 	if (KBD_IS_CONFIGURED(&sc->sc_kbd)) {
