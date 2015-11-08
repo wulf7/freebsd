@@ -189,38 +189,30 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	EVDEV_CLIENT_LOCKQ(client);
 
 	if (EVDEV_CLIENT_EMPTYQ(client)) {
-		if (ioflag & O_NONBLOCK) {
-			EVDEV_CLIENT_UNLOCKQ(client);
-			return (EWOULDBLOCK);
-		}
-
-		if (remaining != 0) {
-			state->ecs_blocked = true;
-			mtx_sleep(client, &client->ec_buffer_mtx, PCATCH,
-			    "evrea", 0);
+		if (ioflag & O_NONBLOCK)
+			ret = EWOULDBLOCK;
+		else {
+			if (remaining != 0) {
+				state->ecs_blocked = true;
+				ret = mtx_sleep(client, &client->ec_buffer_mtx,
+				    PCATCH, "evread", 0);
+			}
 		}
 	}
 
-	for (;;) {
-		if (EVDEV_CLIENT_EMPTYQ(client))
-			/* Short read :-( */
-			break;
-
-		if (remaining == 0)
-			break;
-	
+	while (ret == 0 && !EVDEV_CLIENT_EMPTYQ(client) && remaining > 0) {
 		event = &client->ec_buffer[client->ec_buffer_head];
 		client->ec_buffer_head = (client->ec_buffer_head + 1) % client->ec_buffer_size;
 		remaining--;
 
 		EVDEV_CLIENT_UNLOCKQ(client);
-		uiomove(event, sizeof(struct input_event), uio);
+		ret = uiomove(event, sizeof(struct input_event), uio);
 		EVDEV_CLIENT_LOCKQ(client);
 	}
 
 	EVDEV_CLIENT_UNLOCKQ(client);
 
-	return (0);
+	return (ret);
 }
 
 static int
