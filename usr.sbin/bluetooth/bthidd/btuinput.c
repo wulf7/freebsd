@@ -58,6 +58,78 @@ static int16_t const mbuttons[] = {
 	BTN_TASK
 };
 
+#define	NONE	KEY_RESERVED
+
+static uint16_t const keycodes[256] = {
+	/* 0x00 - 0x27 */
+	NONE,	NONE,	NONE,	NONE,	KEY_A,	KEY_B,	KEY_C,	KEY_D,
+	KEY_E,	KEY_F,	KEY_G,	KEY_H,	KEY_I,	KEY_J,	KEY_K,	KEY_L,
+	KEY_M,	KEY_N,	KEY_O,	KEY_P,	KEY_Q,	KEY_R,	KEY_S,	KEY_T,
+	KEY_U,	KEY_V,	KEY_W,	KEY_X,	KEY_Y,	KEY_Z,	KEY_1,	KEY_2,
+	KEY_3,	KEY_4,	KEY_5,	KEY_6,	KEY_7,	KEY_8,	KEY_9,	KEY_0,
+	/* 0x28 - 0x3f */
+	KEY_ENTER,	KEY_ESC,	KEY_BACKSPACE,	KEY_TAB,
+	KEY_SPACE,	KEY_MINUS,	KEY_EQUAL,	KEY_LEFTBRACE,
+	KEY_RIGHTBRACE,	KEY_BACKSLASH,	KEY_BACKSLASH,	KEY_SEMICOLON,
+	KEY_APOSTROPHE,	KEY_GRAVE,	KEY_COMMA,	KEY_DOT,
+	KEY_SLASH,	KEY_CAPSLOCK,	KEY_F1,		KEY_F2,
+	KEY_F3,		KEY_F4,		KEY_F5,		KEY_F6,
+	/* 0x40 - 0x5f */
+	KEY_F7,		KEY_F8,		KEY_F9,		KEY_F10,
+	KEY_F11,	KEY_F12,	KEY_SYSRQ,	KEY_SCROLLLOCK,
+	KEY_PAUSE,	KEY_INSERT,	KEY_HOME,	KEY_PAGEUP,
+	KEY_DELETE,	KEY_END,	KEY_PAGEDOWN,	KEY_RIGHT,
+	KEY_LEFT,	KEY_DOWN,	KEY_UP,		KEY_NUMLOCK,
+	KEY_SLASH,	KEY_KPASTERISK,	KEY_KPMINUS,	KEY_KPPLUS,
+	KEY_KPENTER,	KEY_KP1,	KEY_KP2,	KEY_KP3,
+	KEY_KP4,	KEY_KP5,	KEY_KP6,	KEY_KP7,
+	/* 0x60 - 0x7f */
+	KEY_KP8,	KEY_KP9,	KEY_KP0,	KEY_KPDOT,
+	KEY_102ND,	KEY_COMPOSE,	KEY_POWER,	KEY_KPEQUAL,
+	KEY_F13,	KEY_F14,	KEY_F15,	KEY_F16,
+	KEY_F17,	KEY_F18,	KEY_F19,	KEY_F20,
+	KEY_F21,	KEY_F22,	KEY_F23,	KEY_F24,
+	KEY_OPEN,	KEY_HELP,	KEY_PROPS,	KEY_FRONT,
+	KEY_STOP,	KEY_AGAIN,	KEY_UNDO,	KEY_CUT,
+	KEY_COPY,	KEY_PASTE,	KEY_FIND,	KEY_MUTE,
+	/* 0x80 - 0x9f */
+	KEY_VOLUMEUP,	KEY_VOLUMEDOWN,	NONE,		NONE,
+	NONE,		KEY_KPCOMMA,	NONE,		KEY_RO,
+	KEY_KATAKANAHIRAGANA,	KEY_YEN,KEY_HENKAN,	KEY_MUHENKAN,
+	KEY_KPJPCOMMA,	NONE,		NONE,		NONE,
+	KEY_HANGEUL,	KEY_HANJA,	KEY_KATAKANA,	KEY_HIRAGANA,
+	KEY_ZENKAKUHANKAKU,	NONE,	NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	/* 0xa0 - 0xbf */
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
+	/* 0xc0 - 0xdf */
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	NONE,		NONE,           NONE,		NONE,
+	/* 0xe0 - 0xff */
+	KEY_LEFTCTRL,	KEY_LEFTSHIFT,	KEY_LEFTALT,	KEY_LEFTMETA,
+	KEY_RIGHTCTRL,	KEY_RIGHTSHIFT,	KEY_RIGHTALT,	KEY_RIGHTMETA,
+	KEY_PLAYPAUSE,	KEY_STOPCD,	KEY_PREVIOUSSONG,KEY_NEXTSONG,
+	KEY_EJECTCD,	KEY_VOLUMEUP,	KEY_VOLUMEDOWN, KEY_MUTE,
+	KEY_WWW,	KEY_BACK,	KEY_FORWARD,	KEY_STOP,
+	KEY_FIND,	KEY_SCROLLUP,	KEY_SCROLLDOWN,	KEY_EDIT,
+	KEY_SLEEP,	KEY_COFFEE,	KEY_REFRESH,	KEY_CALC,
+	NONE,		NONE,		NONE,		NONE,
+};
+
 /*
  * Setup uinput device as 8button mouse with wheel
  * TODO: copypaste feature detection code from ums
@@ -101,6 +173,59 @@ uinput_create_mouse(bthid_session_p const s)
 	/* Set evdev device name and bus/vendor information */
 	memset(&uidev, 0, sizeof(uidev));
 	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Mouse (%s)",
+		bt_ntoa(&s->bdaddr, NULL));
+	uidev.id.bustype = BUS_BLUETOOTH;
+	uidev.id.vendor  = 0x0000; /* Dummy value */
+	uidev.id.product = 0x0000; /* Dummy value */
+	uidev.id.version = 0x0000; /* Dummy value */
+	if (write(s->uinput, &uidev, sizeof(uidev)) < 0)
+		goto bail_out;
+
+	if (ioctl(s->uinput, UI_DEV_CREATE) >= 0)
+		return (0); /* SUCCESS */
+
+bail_out:
+	return (-1);
+}
+
+/*
+ * Setup uinput keyboard
+ */
+int
+uinput_create_keyboard(bthid_session_p const s)
+{
+	size_t			i, len;
+	struct uinput_user_dev	uidev;
+	struct sockaddr_l2cap	local;
+	socklen_t		sclen;
+	char			devname[HCI_DEVNAME_SIZE];
+	const char		*phys;
+
+	/* Find bluetooth device name or take local bdaddr */
+	sclen = sizeof(local);
+	if (getsockname(s->ctrl, (struct sockaddr *) &local, &sclen) == 0 &&
+	    bt_devname(devname, &local.l2cap_bdaddr) != 0) {
+		len = strnlen(devname, HCI_DEVNAME_SIZE);
+		/* cut "hci" ending */
+		if (len > 4 && strncmp(devname + len - 3, "hci", 3) == 0)
+			devname[len - 3] = 0;
+		phys = devname;
+	} else
+		phys = bt_ntoa(&local.l2cap_bdaddr, NULL);
+
+	/* Advertise key events */
+	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
+	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0)
+		goto bail_out;
+
+	/* Advertise keycodes */
+	for (i = 0; i < nitems(keycodes); i++)
+		if (ioctl(s->uinput, UI_SET_KEYBIT, keycodes[i]) < 0)
+			goto bail_out;
+
+	/* Set evdev device name and bus/vendor information */
+	memset(&uidev, 0, sizeof(uidev));
+	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Keyboard (%s)",
 		bt_ntoa(&s->bdaddr, NULL));
 	uidev.id.bustype = BUS_BLUETOOTH;
 	uidev.id.vendor  = 0x0000; /* Dummy value */
@@ -160,4 +285,24 @@ uinput_report_mouse(bthid_session_p s, struct mouse_info *mi)
 		return (-1);
 
 	return (0);
+}
+
+/*
+ * Translate given keymap and write keyscodes
+ */
+void
+uinput_kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd)
+{
+	size_t i;
+	uint16_t n;
+
+	for (i = fb; i < nitems(keycodes); i++) {
+		if (bit_test(m, i)) {
+			n = keycodes[i];
+			if (n == NONE)
+				continue;
+			uinput_write_event(fd, EV_KEY, n, make);
+			uinput_write_event(fd, EV_SYN, SYN_REPORT, 0);
+		}
+	}
 }

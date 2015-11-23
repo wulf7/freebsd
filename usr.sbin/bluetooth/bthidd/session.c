@@ -86,7 +86,7 @@ session_open(bthid_server_p srv, hid_device_p const d)
 	}
 
 #ifdef UINPUT
-	if (d->mouse) {
+	if (d->mouse || d->keyboard) {
 		s->uinput = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
 		if (s->uinput < 0)
 			syslog(LOG_ERR, "Could not open /dev/uinput " \

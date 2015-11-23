@@ -293,8 +293,12 @@ server_accept(bthid_server_p srv, int32_t fd)
 			srv->maxfd = s->vkbd;
 	}
 #ifdef UINPUT
-	if (s->state == OPEN && d->mouse && s->uinput != -1)
-		uinput_create_mouse(s);
+	if (s->state == OPEN && s->uinput != -1) {
+		if (d->mouse)
+			uinput_create_mouse(s);
+		else if (d->keyboard)
+			uinput_create_keyboard(s);
+	}
 #endif
 
 	return (0);

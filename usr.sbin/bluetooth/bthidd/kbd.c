@@ -56,6 +56,10 @@
 #include "bthidd.h"
 #include "kbd.h"
 
+#ifdef UINPUT
+#include "btuinput.h"
+#endif
+
 static void	kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd);
 static int32_t	kbd_xlate(int32_t code, int32_t make, int32_t *b, int32_t const *eob);
 
@@ -352,6 +356,9 @@ kbd_process_keys(bthid_session_p s)
 		if (f2 != -1) {
 			/* release old keys */
 			kbd_write(s->keys2, f2, 0, s->vkbd);
+#ifdef UINPUT
+			uinput_kbd_write(s->keys2, f2, 0, s->uinput);
+#endif
 			memset(s->keys2, 0, bitstr_size(xsize));
 		}
 
@@ -364,6 +371,9 @@ kbd_process_keys(bthid_session_p s)
 		
 		memcpy(s->keys2, s->keys1, bitstr_size(xsize));
 		kbd_write(s->keys1, f1, 1, s->vkbd);
+#ifdef UINPUT
+		uinput_kbd_write(s->keys1, f1, 1, s->uinput);
+#endif
 		memset(s->keys1, 0, bitstr_size(xsize));
 
 		return (0);
@@ -391,12 +401,19 @@ kbd_process_keys(bthid_session_p s)
 	}
 
 	bit_ffs(diff, xsize, &f2);
-	if (f2 > 0)
+	if (f2 > 0) {
 		kbd_write(diff, f2, 0, s->vkbd);
+#ifdef UINPUT
+		uinput_kbd_write(diff, f2, 0, s->uinput);
+#endif
+	}
 
 	bit_ffs(s->keys1, xsize, &f1);
 	if (f1 > 0) {
 		kbd_write(s->keys1, f1, 1, s->vkbd);
+#ifdef UINPUT
+		uinput_kbd_write(s->keys1, f1, 1, s->uinput);
+#endif
 		memset(s->keys1, 0, bitstr_size(xsize));
 	}
 

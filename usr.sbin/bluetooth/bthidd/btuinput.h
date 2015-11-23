@@ -32,6 +32,8 @@
 #include <sys/consio.h>
 
 int uinput_create_mouse(bthid_session_p const s);
+int uinput_create_keyboard(bthid_session_p const s);
 int uinput_report_mouse(bthid_session_p s, struct mouse_info *mi);
+void uinput_kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd);
 
 #endif /* ndef _UINPUT_H_ */
