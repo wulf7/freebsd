@@ -338,14 +338,20 @@ static int
 uinput_cdev_create(void)
 {
 	struct uinput_cdev_softc *sc;
+	struct make_dev_args mda;
 	struct cdev *cdev;
 
-	cdev = make_dev(&uinput_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600,
-	    "uinput");
-
 	sc = malloc(sizeof(struct uinput_cdev_softc), M_EVDEV, M_WAITOK | M_ZERO);
-	
-	cdev->si_drv1 = sc;
+
+	make_dev_args_init(&mda);
+	mda.mda_devsw = &uinput_cdevsw;
+	mda.mda_uid = UID_ROOT;
+	mda.mda_gid = GID_WHEEL;
+	mda.mda_mode = 0600;
+	mda.mda_si_drv1 = sc;
+
+	make_dev_s(&mda, &cdev, "uinput");
+
 	return (0);
 }
 

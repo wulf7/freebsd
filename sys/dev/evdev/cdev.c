@@ -633,24 +633,31 @@ int
 evdev_cdev_create(struct evdev_dev *evdev)
 {
 	struct evdev_cdev_softc *sc;
-	struct cdev *cdev;
+	struct make_dev_args mda;
 	int ret, unit = 0;
-
-	/* Try to coexist with cuse-backed input/event devices */
-	while ((ret = make_dev_p(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
-	    &cdev, &evdev_cdevsw, NULL, UID_ROOT, GID_WHEEL, 0600,
-	    "input/event%d", unit)) == EEXIST)
-		unit++;
-	if (ret != 0)
-		return (ret);
 
 	sc = malloc(sizeof(struct evdev_cdev_softc), M_EVDEV,
 	    M_WAITOK | M_ZERO);
-	
 	sc->ecs_evdev = evdev;
-	evdev->ev_cdev = cdev;
+
+	make_dev_args_init(&mda);
+	mda.mda_flags = MAKEDEV_WAITOK | MAKEDEV_CHECKNAME;
+	mda.mda_devsw = &evdev_cdevsw;
+	mda.mda_uid = UID_ROOT;
+	mda.mda_gid = GID_WHEEL;
+	mda.mda_mode = 0600;
+	mda.mda_si_drv1 = sc;
+
+	/* Try to coexist with cuse-backed input/event devices */
+	while ((ret = make_dev_s(&mda, &evdev->ev_cdev, "input/event%d", unit))
+	    == EEXIST)
+		unit++;
+	if (ret != 0) {
+		free(sc, M_EVDEV);
+		return (ret);
+	}
+
 	evdev->ev_unit = unit;
-	cdev->si_drv1 = sc;
 	return (0);
 }
 
