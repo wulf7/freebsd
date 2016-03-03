@@ -484,7 +484,11 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 			evdev_set_softc(evdev, state);
 			evdev_support_event(evdev, EV_SYN);
 			evdev_support_event(evdev, EV_KEY);
+			evdev_support_event(evdev, EV_LED);
 			evdev_support_all_known_keys(evdev);
+			evdev_support_led(evdev, LED_NUML);
+			evdev_support_led(evdev, LED_CAPSL);
+			evdev_support_led(evdev, LED_SCROLLL);
 
 			evdev_register(dev, evdev);
 			state->ks_evdev = evdev;
@@ -1001,6 +1005,13 @@ atkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				return error;
 			}
 		}
+#ifdef EVDEV
+		/* push LED states to evdev */
+		if (state->ks_evdev != NULL && state->ks_evdev_opened) {
+			evdev_push_leds(state->ks_evdev, *(int *)arg);
+			evdev_sync(state->ks_evdev);
+		}
+#endif
 		KBD_LED_VAL(kbd) = *(int *)arg;
 		break;
 

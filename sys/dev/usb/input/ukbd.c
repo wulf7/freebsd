@@ -939,6 +939,11 @@ ukbd_set_leds_callback(struct usb_xfer *xfer, usb_error_t error)
 		if (!any)
 			break;
 
+#ifdef EVDEV
+		evdev_push_leds(sc->sc_evdev, sc->sc_leds);
+		evdev_sync(sc->sc_evdev);
+#endif
+
 		/* range check output report length */
 		len = sc->sc_led_size;
 		if (len > (UKBD_BUFFER_SIZE - 1))
@@ -1314,10 +1319,19 @@ ukbd_attach(device_t dev)
 	evdev_set_methods(sc->sc_evdev, &ukbd_evdev_methods);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
 	evdev_support_event(sc->sc_evdev, EV_KEY);
+	if (sc->sc_flags & (UKBD_FLAG_NUMLOCK | UKBD_FLAG_CAPSLOCK |
+			    UKBD_FLAG_SCROLLLOCK))
+		evdev_support_event(sc->sc_evdev, EV_LED);
 	evdev_support_repeat(sc->sc_evdev, DRIVER_REPEAT);
 
 	for (i = 0x00; i <= 0xFF; i++)
 		evdev_support_key(sc->sc_evdev, evdev_hid2key(i));
+	if (sc->sc_flags & UKBD_FLAG_NUMLOCK)
+		evdev_support_led(sc->sc_evdev, LED_NUML);
+	if (sc->sc_flags & UKBD_FLAG_CAPSLOCK)
+		evdev_support_led(sc->sc_evdev, LED_CAPSL);
+	if (sc->sc_flags & UKBD_FLAG_SCROLLLOCK)
+		evdev_support_led(sc->sc_evdev, LED_SCROLLL);
 
 	evdev_register(dev, sc->sc_evdev);
 #endif

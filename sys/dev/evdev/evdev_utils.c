@@ -196,6 +196,12 @@ static uint16_t evdev_mouse_button_codes[] = {
 	BTN_TASK,
 };
 
+static uint16_t evdev_led_codes[] = {
+	LED_CAPSL,	/* CLKED */
+	LED_NUML,	/* NLKED */
+	LED_SCROLLL,	/* SLKED */
+};
+
 
 inline uint16_t
 evdev_hid2key(int scancode)
@@ -264,4 +270,18 @@ evdev_push_mouse_btn(struct evdev_dev *evdev, int buttons)
 	for (i = 0; i < nitems(evdev_mouse_button_codes); i++)
 		evdev_push_event(evdev, EV_KEY, evdev_mouse_button_codes[i],
 		    (buttons & (1 << i)) != 0);
+}
+
+void
+evdev_push_leds(struct evdev_dev *evdev, int leds)
+{
+	size_t i;
+
+	/* Some drivers initialize leds before evdev */
+	if (evdev == NULL)
+		return;
+
+	for (i = 0; i < nitems(evdev_led_codes); i++)
+		evdev_push_event(evdev, EV_LED, evdev_led_codes[i],
+		    (leds & (1 << i)) != 0);
 }
