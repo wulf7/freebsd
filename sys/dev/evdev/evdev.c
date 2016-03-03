@@ -444,6 +444,10 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 
+	/* Allow SYN events implicitly */
+	if (type != EV_SYN && !evdev_event_supported(evdev, type))
+		return (EINVAL);
+
 	switch (type) {
 	case EV_SYN:
 		if (code >= SYN_CNT)
@@ -453,15 +457,21 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	case EV_KEY:
 		if (code >= KEY_CNT)
 			return (EINVAL);
+		if (!get_bit(evdev->ev_key_flags, code))
+			return (EINVAL);
 		break;
 
 	case EV_REL:
 		if (code >= REL_CNT)
 			return (EINVAL);
+		if (!get_bit(evdev->ev_rel_flags, code))
+			return (EINVAL);
 		break;
 
 	case EV_ABS:
 		if (code >= ABS_CNT)
+			return (EINVAL);
+		if (!get_bit(evdev->ev_abs_flags, code))
 			return (EINVAL);
 		if (code == ABS_MT_SLOT && value >= MAX_MT_SLOTS)
 			return (EINVAL);
@@ -470,20 +480,28 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	case EV_MSC:
 		if (code >= MSC_CNT)
 			return (EINVAL);
+		if (!get_bit(evdev->ev_msc_flags, code))
+			return (EINVAL);
 		break;
 
 	case EV_LED:
 		if (code >= LED_CNT)
+			return (EINVAL);
+		if (!get_bit(evdev->ev_led_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_SND:
 		if (code >= SND_CNT)
 			return (EINVAL);
+		if (!get_bit(evdev->ev_snd_flags, code))
+			return (EINVAL);
 		break;
 
 	case EV_SW:
 		if (code >= SW_CNT)
+			return (EINVAL);
+		if (!get_bit(evdev->ev_sw_flags, code))
 			return (EINVAL);
 		break;
 
