@@ -444,34 +444,52 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 
-	if (type == EV_SYN) {
+	switch (type) {
+	case EV_SYN:
 		if (code >= SYN_CNT)
 			return (EINVAL);
-	} else if (type == EV_KEY) {
+		break;
+
+	case EV_KEY:
 		if (code >= KEY_CNT)
 			return (EINVAL);
-	} else if (type == EV_REL) {
+		break;
+
+	case EV_REL:
 		if (code >= REL_CNT)
 			return (EINVAL);
-	} else if (type == EV_ABS) {
+		break;
+
+	case EV_ABS:
 		if (code >= ABS_CNT)
 			return (EINVAL);
 		if (code == ABS_MT_SLOT && value >= MAX_MT_SLOTS)
 			return (EINVAL);
-	} else if (type == EV_MSC) {
+		break;
+
+	case EV_MSC:
 		if (code >= MSC_CNT)
 			return (EINVAL);
-	} else if (type == EV_LED) {
+		break;
+
+	case EV_LED:
 		if (code >= LED_CNT)
 			return (EINVAL);
-	} else if (type == EV_SND) {
+		break;
+
+	case EV_SND:
 		if (code >= SND_CNT)
 			return (EINVAL);
-	} else if (type == EV_SW) {
+		break;
+
+	case EV_SW:
 		if (code >= SW_CNT)
 			return (EINVAL);
-	} else
+		break;
+
+	default:
 		return (EINVAL);
+	}
 
 	return (0);
 }
