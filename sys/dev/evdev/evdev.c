@@ -157,17 +157,18 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 		}
 	}
 
+	/* All misc events can be reported simultaneously */
+	for (i = 0; i < MSC_CNT; i++)
+		if (get_bit(evdev->ev_msc_flags, i))
+			size++;
+
+
+	/* All leds can be reported simultaneously */
+	for (i = 0; i < LED_CNT; i++)
+		if (get_bit(evdev->ev_led_flags, i))
+			size++;
+
 	/* Assume other events are generated once per report */
-	type_detected = 0;
-	for (i = 0; i < nlongs(MSC_CNT); i++)
-		type_detected |= evdev->ev_msc_flags[i];
-	size += (type_detected != 0);
-
-	type_detected = 0;
-	for (i = 0; i < nlongs(LED_CNT); i++)
-		type_detected |= evdev->ev_led_flags[i];
-	size += (type_detected != 0);
-
 	type_detected = 0;
 	for (i = 0; i < nlongs(SND_CNT); i++)
 		type_detected |= evdev->ev_snd_flags[i];
