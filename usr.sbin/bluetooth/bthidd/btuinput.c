@@ -159,6 +159,7 @@ uinput_create_mouse(bthid_session_p const s)
 	/* Advertise events and axes */
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_REL) < 0 ||
+	    ioctl(s->uinput, UI_SET_EVBIT, EV_SYN) < 0 ||
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_X) < 0 ||
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_Y) < 0 ||
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_WHEEL) < 0 ||
@@ -215,6 +216,7 @@ uinput_create_keyboard(bthid_session_p const s)
 
 	/* Advertise key events */
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
+	    ioctl(s->uinput, UI_SET_EVBIT, EV_SYN) < 0 ||
 	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0)
 		goto bail_out;
 
