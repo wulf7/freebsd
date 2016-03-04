@@ -29,6 +29,7 @@
 #include <sys/param.h>
 #include <sys/consio.h>
 #include <sys/ioctl.h>
+#include <sys/kbio.h>
 #include <sys/queue.h>
 
 #include <dev/evdev/input.h>
@@ -216,7 +217,11 @@ uinput_create_keyboard(bthid_session_p const s)
 
 	/* Advertise key events */
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
+	    ioctl(s->uinput, UI_SET_EVBIT, EV_LED) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_SYN) < 0 ||
+	    ioctl(s->uinput, UI_SET_LEDBIT, LED_CAPSL) < 0 ||
+	    ioctl(s->uinput, UI_SET_LEDBIT, LED_NUML) < 0 ||
+	    ioctl(s->uinput, UI_SET_LEDBIT, LED_SCROLLL) < 0 ||
 	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0)
 		goto bail_out;
 
@@ -307,4 +312,30 @@ uinput_kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd)
 			uinput_write_event(fd, EV_SYN, SYN_REPORT, 0);
 		}
 	}
+}
+
+int
+uinput_report_leds(int fd, int state, int mask)
+{
+
+	if (mask & LED_CAP &&
+	    uinput_write_event(fd, EV_LED, LED_CAPSL,
+	        state & LED_CAP ? 1 : 0) < 0)
+		return (-1);
+
+	if (mask & LED_NUM &&
+	    uinput_write_event(fd, EV_LED, LED_NUML,
+	        state & LED_NUM ? 1 : 0) < 0)
+		return (-1);
+
+	if (mask & LED_NUM &&
+	    uinput_write_event(fd, EV_LED, LED_SCROLLL,
+	        state & LED_SCR ? 1 : 0) < 0)
+		return (-1);
+
+	if (mask & (LED_CAP | LED_NUM | LED_SCR) &&
+	    uinput_write_event(fd, EV_SYN, SYN_REPORT, 0) < 0)
+		return (-1);
+
+	return (0);
 }

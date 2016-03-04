@@ -535,6 +535,9 @@ kbd_status_changed(bthid_session_p s, uint8_t *data, int32_t len)
 	hid_device_p	hid_device;
 	hid_data_t	d;
 	hid_item_t	h;
+#ifdef UINPUT
+	uint8_t		leds_mask = 0;
+#endif
 
 	assert(s != NULL);
 	assert(len == sizeof(vkbd_status_t));
@@ -568,16 +571,25 @@ kbd_status_changed(bthid_session_p s, uint8_t *data, int32_t len)
 			case 0x01: /* Num Lock LED */
 				if (st.leds & LED_NUM)
 					hid_set_data(&data[1], &h, 1);
+#ifdef UINPUT
+				leds_mask |= LED_NUM;
+#endif
 				break;
 
 			case 0x02: /* Caps Lock LED */
 				if (st.leds & LED_CAP)
 					hid_set_data(&data[1], &h, 1);
+#ifdef UINPUT
+				leds_mask |= LED_CAP;
+#endif
 				break;
 
 			case 0x03: /* Scroll Lock LED */
 				if (st.leds & LED_SCR)
 					hid_set_data(&data[1], &h, 1);
+#ifdef UINPUT
+				leds_mask |= LED_SCR;
+#endif
 				break;
 
 			/* XXX add other LEDs ? */
@@ -588,6 +600,10 @@ kbd_status_changed(bthid_session_p s, uint8_t *data, int32_t len)
 
 	if (found)
 		write(s->intr, data, (report_id != NO_REPORT_ID) ? 3 : 2);
+
+#ifdef UINPUT
+	uinput_report_leds(s->uinput, st.leds, leds_mask);
+#endif
 
 	return (0);
 }
