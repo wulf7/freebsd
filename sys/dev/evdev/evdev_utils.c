@@ -33,9 +33,12 @@
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/malloc.h>
+#include <sys/kbio.h>
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
+
+#include <dev/kbd/kbdreg.h>
 
 #define	NONE	KEY_RESERVED
 
@@ -284,4 +287,37 @@ evdev_push_leds(struct evdev_dev *evdev, int leds)
 	for (i = 0; i < nitems(evdev_led_codes); i++)
 		evdev_push_event(evdev, EV_LED, evdev_led_codes[i],
 		    (leds & (1 << i)) != 0);
+}
+
+void
+evdev_ev_kbd_event(struct evdev_dev *evdev, void *softc, uint16_t type,
+    uint16_t code, int32_t value)
+{
+        keyboard_t *kbd = (keyboard_t *)softc;
+	int delay[2], leds, oleds;
+	size_t i;
+
+	if (type == EV_LED) {
+		leds = oleds = KBD_LED_VAL(kbd);
+		for (i = 0; i < nitems(evdev_led_codes); i++) {
+			if (evdev_led_codes[i] == code) {
+				if (value)
+					leds |= 1 << i;
+				else
+					leds &= ~(1 << i);
+				if (leds != oleds)
+					kbdd_ioctl(kbd, KDSETLED,
+					    (caddr_t)&leds);
+				break;
+			}
+		}
+	} else if (type == EV_REP && code == REP_DELAY) {
+		delay[0] = value;
+		delay[1] = kbd->kb_delay2;
+		kbdd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
+	} else if (type == EV_REP && code == REP_PERIOD) {
+		delay[0] = kbd->kb_delay1;
+		delay[1] = value;
+		kbdd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
+	}
 }

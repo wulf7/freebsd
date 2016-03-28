@@ -385,12 +385,10 @@ static device_detach_t ukbd_detach;
 static device_resume_t ukbd_resume;
 
 #ifdef EVDEV
-static evdev_event_t ukbd_ev_event;
-
 static struct evdev_methods ukbd_evdev_methods = {
 	.ev_open = NULL,
 	.ev_close = NULL,
-	.ev_event = ukbd_ev_event,
+	.ev_event = evdev_ev_kbd_event,
 };
 #endif
 
@@ -1315,7 +1313,7 @@ ukbd_attach(device_t dev)
 	sc->sc_evdev = evdev_alloc();
 	evdev_set_name(sc->sc_evdev, device_get_desc(dev));
 	evdev_set_serial(sc->sc_evdev, "0");
-	evdev_set_softc(sc->sc_evdev, sc);
+	evdev_set_softc(sc->sc_evdev, kbd);
 	evdev_set_methods(sc->sc_evdev, &ukbd_evdev_methods);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
 	evdev_support_event(sc->sc_evdev, EV_KEY);
@@ -1442,21 +1440,6 @@ ukbd_resume(device_t dev)
 
 	return (0);
 }
-
-#ifdef EVDEV
-static void
-ukbd_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
-    uint16_t code, int32_t value)
-{
-	struct ukbd_softc *sc = (struct ukbd_softc *)softc;
-
-	if (type == EV_REP && code == REP_DELAY)
-		sc->sc_kbd.kb_delay1 = value;
-
-	if (type == EV_REP && code == REP_PERIOD)
-		sc->sc_kbd.kb_delay2 = value;
-}
-#endif
 
 /* early keyboard probe, not supported */
 static int
