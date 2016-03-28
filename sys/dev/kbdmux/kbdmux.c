@@ -390,12 +390,14 @@ static void kbdmux_ev_close(struct evdev_dev *, void *);
 struct evdev_methods kbdmux_evdev_methods = {
 	.ev_open = kbdmux_ev_open,
 	.ev_close = kbdmux_ev_close,
+	.ev_event = evdev_ev_kbd_event,
 };
 
 static int
 kbdmux_ev_open(struct evdev_dev *evdev, void *softc)
 {
- 	struct kbdmux_state *state = (struct kbdmux_state *)softc;
+	keyboard_t *kbd = (keyboard_t *)softc;
+ 	struct kbdmux_state *state = kbd->kb_data;
 
 	state->ks_evdev_opened = true;
 	return (0);
@@ -404,7 +406,8 @@ kbdmux_ev_open(struct evdev_dev *evdev, void *softc)
 static void
 kbdmux_ev_close(struct evdev_dev *evdev, void *softc)
 {
-	struct kbdmux_state *state = (struct kbdmux_state *)softc;
+	keyboard_t *kbd = (keyboard_t *)softc;
+ 	struct kbdmux_state *state = kbd->kb_data;
 
 	state->ks_evdev_opened = false;
 }
@@ -515,7 +518,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_set_phys(evdev, phys_loc);
 		evdev_set_serial(evdev, "0");
 		evdev_set_methods(evdev, &kbdmux_evdev_methods);
-		evdev_set_softc(evdev, state);
+		evdev_set_softc(evdev, kbd);
 		evdev_support_event(evdev, EV_SYN);
 		evdev_support_event(evdev, EV_KEY);
 		evdev_support_event(evdev, EV_LED);
