@@ -1285,7 +1285,12 @@ kbdmux_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 
 		kbd->kb_delay1 = delays[(mode >> 5) & 3];
 		kbd->kb_delay2 = rates[mode & 0x1f];
-
+#ifdef EVDEV
+		if (state->ks_evdev != NULL && state->ks_evdev_opened) {
+			evdev_push_repeats(state->ks_evdev, kbd);
+			evdev_sync(state->ks_evdev);
+		}
+#endif
 		/* perform command on all slave keyboards */
 		SLIST_FOREACH(k, &state->ks_kbds, next)
 			(void)kbdd_ioctl(k->kbd, cmd, arg);

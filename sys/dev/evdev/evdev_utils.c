@@ -290,6 +290,19 @@ evdev_push_leds(struct evdev_dev *evdev, int leds)
 }
 
 void
+evdev_push_repeats(struct evdev_dev *evdev, keyboard_t *kbd)
+{
+	/* Some drivers initialize typematics before evdev */
+	if (evdev == NULL)
+		return;
+
+	evdev_set_repeat_params(evdev, REP_DELAY, kbd->kb_delay1);
+	evdev_set_repeat_params(evdev, REP_PERIOD, kbd->kb_delay2);
+	evdev_push_event(evdev, EV_REP, REP_DELAY, kbd->kb_delay1);
+	evdev_push_event(evdev, EV_REP, REP_PERIOD, kbd->kb_delay2);
+}
+
+void
 evdev_ev_kbd_event(struct evdev_dev *evdev, void *softc, uint16_t type,
     uint16_t code, int32_t value)
 {

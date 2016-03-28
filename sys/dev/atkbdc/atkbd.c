@@ -1046,6 +1046,13 @@ atkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		if (error == 0) {
 			kbd->kb_delay1 = typematic_delay(i);
 			kbd->kb_delay2 = typematic_rate(i);
+#ifdef EVDEV
+			if (state->ks_evdev != NULL &&
+			     state->ks_evdev_opened) {
+				evdev_push_repeats(state->ks_evdev, kbd);
+				evdev_sync(state->ks_evdev);
+			}
+#endif
 		}
 		return error;
 
@@ -1064,6 +1071,13 @@ atkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		if (error == 0) {
 			kbd->kb_delay1 = typematic_delay(*(int *)arg);
 			kbd->kb_delay2 = typematic_rate(*(int *)arg);
+#ifdef EVDEV
+			if (state->ks_evdev != NULL &&
+			     state->ks_evdev_opened) {
+				evdev_push_repeats(state->ks_evdev, kbd);
+				evdev_sync(state->ks_evdev);
+			}
+#endif
 		}
 		return error;
 

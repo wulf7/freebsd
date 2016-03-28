@@ -31,7 +31,9 @@
 
 #include <sys/queue.h>
 #include <sys/malloc.h>
+#include <sys/kbio.h>
 #include <dev/evdev/input.h>
+#include <dev/kbd/kbdreg.h>
 
 #define	NAMELEN		80
 #define	LONG_WIDTH	(sizeof(unsigned long) * 8)
@@ -221,6 +223,7 @@ uint16_t evdev_scancode2key(int *, int);
 void evdev_client_dumpqueue(struct evdev_client *);
 void evdev_push_mouse_btn(struct evdev_dev *, int);
 void evdev_push_leds(struct evdev_dev *, int);
+void evdev_push_repeats(struct evdev_dev *, keyboard_t *);
 evdev_event_t evdev_ev_kbd_event;
 
 #endif	/* _DEV_EVDEV_EVDEV_H */

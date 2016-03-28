@@ -1941,10 +1941,8 @@ ukbd_ioctl_locked(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			kbd->kb_delay1 = ((int *)arg)[0];
 		kbd->kb_delay2 = ((int *)arg)[1];
 #ifdef EVDEV
-		evdev_set_repeat_params(sc->sc_evdev, REP_DELAY,
-		    kbd->kb_delay1);
-		evdev_set_repeat_params(sc->sc_evdev, REP_PERIOD,
-		    kbd->kb_delay2);
+		evdev_push_repeats(sc->sc_evdev, kbd);
+		evdev_sync(sc->sc_evdev);
 #endif
 		return (0);
 
@@ -2100,8 +2098,8 @@ ukbd_set_typematic(keyboard_t *kbd, int code)
 	kbd->kb_delay1 = delays[(code >> 5) & 3];
 	kbd->kb_delay2 = rates[code & 0x1f];
 #ifdef EVDEV
-	evdev_set_repeat_params(sc->sc_evdev, REP_DELAY, kbd->kb_delay1);
-	evdev_set_repeat_params(sc->sc_evdev, REP_PERIOD, kbd->kb_delay2);
+	evdev_push_repeats(sc->sc_evdev, kbd);
+	evdev_sync(sc->sc_evdev);
 #endif
 	return (0);
 }
