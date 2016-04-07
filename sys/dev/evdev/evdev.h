@@ -140,7 +140,6 @@ struct evdev_dev
 
 	/* Counters: */
 	uint64_t		ev_event_count;
-	int			ev_clients_count;
 
 	struct evdev_methods *	ev_methods;
 

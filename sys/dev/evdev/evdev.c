@@ -677,14 +677,13 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 	debugf("adding new client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK(evdev);
-	if (evdev->ev_clients_count == 0 && evdev->ev_methods != NULL &&
+	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_open != NULL) {
 		debugf("calling ev_open() on device %s", evdev->ev_shortname);
 		evdev->ev_methods->ev_open(evdev, evdev->ev_softc);
 	}
 
 	LIST_INSERT_HEAD(&evdev->ev_clients, client, ec_link);
-	evdev->ev_clients_count++;
 	EVDEV_UNLOCK(evdev);
 	*clientp = client;
 	return (0);
@@ -698,12 +697,10 @@ evdev_dispose_client(struct evdev_client *client)
 	debugf("removing client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK(evdev);
-	evdev->ev_clients_count--;
-	if (evdev->ev_clients_count == 0 && evdev->ev_methods != NULL &&
+	LIST_REMOVE(client, ec_link);
+	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_close != NULL)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
-
-	LIST_REMOVE(client, ec_link);
 	EVDEV_UNLOCK(evdev);
 	free(client, M_EVDEV);
 	return (0);
