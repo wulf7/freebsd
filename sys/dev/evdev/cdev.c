@@ -51,7 +51,6 @@
 #endif
 
 static int evdev_open(struct cdev *, int, int, struct thread *);
-static int evdev_close(struct cdev *, int, int, struct thread *);
 static int evdev_read(struct cdev *, struct uio *, int);
 static int evdev_write(struct cdev *, struct uio *, int);
 static int evdev_ioctl(struct cdev *, u_long, caddr_t, int, struct thread *);
@@ -67,14 +66,12 @@ static int evdev_ioctl_eviocgbit(struct evdev_dev *, int, int, caddr_t);
 static struct cdevsw evdev_cdevsw = {
 	.d_version = D_VERSION,
 	.d_open = evdev_open,
-	.d_close = evdev_close,
 	.d_read = evdev_read,
 	.d_write = evdev_write,
 	.d_ioctl = evdev_ioctl,
 	.d_poll = evdev_poll,
 	.d_kqfilter = evdev_kqfilter,
 	.d_name = "evdev",
-	.d_flags = D_TRACKCLOSE
 };
 
 static struct filterops evdev_cdev_filterops = {
@@ -82,14 +79,6 @@ static struct filterops evdev_cdev_filterops = {
 	.f_attach = NULL,
 	.f_detach = evdev_kqdetach,
 	.f_event = evdev_kqread,
-};
-
-struct evdev_cdev_softc
-{
-	struct evdev_dev *	ecs_evdev;
-	int			ecs_open_count;
-
-	LIST_ENTRY(evdev_cdev_softc) ecs_link;
 };
 
 struct evdev_cdev_state
@@ -107,8 +96,7 @@ struct evdev_cdev_state
 static int
 evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_cdev_state *state;
 	int ret;
 
@@ -130,17 +118,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	knlist_init_mtx(&state->ecs_selp.si_note,
 	    &state->ecs_client->ec_buffer_mtx);
 
-	sc->ecs_open_count++;
 	devfs_set_cdevpriv(state, evdev_dtor);
-	return (0);
-}
-
-static int
-evdev_close(struct cdev *dev, int fflag, int devtype, struct thread *td)
-{
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-
-	sc->ecs_open_count--;
 	return (0);
 }
 
@@ -160,8 +138,7 @@ evdev_dtor(void *data)
 static int
 evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_cdev_state *state;
 	struct evdev_client *client;
 	struct input_event *event;
@@ -218,8 +195,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_cdev_state *state;
 	int ret = 0;
 	
@@ -244,8 +220,7 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 evdev_poll(struct cdev *dev, int events, struct thread *td)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
 	struct evdev_cdev_state *state;
 	int ret;
@@ -279,8 +254,7 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 static int
 evdev_kqfilter(struct cdev *dev, struct knote *kn)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_cdev_state *state;
 	int ret;
 
@@ -333,8 +307,7 @@ static int
 evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
     struct thread *td)
 {
-	struct evdev_cdev_softc *sc = dev->si_drv1;
-	struct evdev_dev *evdev = sc->ecs_evdev;
+	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_cdev_state *state;
 	struct input_keymap_entry *ke;
 	int rep_params[2];
@@ -632,13 +605,8 @@ evdev_notify_event(struct evdev_client *client, void *data)
 int
 evdev_cdev_create(struct evdev_dev *evdev)
 {
-	struct evdev_cdev_softc *sc;
 	struct make_dev_args mda;
 	int ret, unit = 0;
-
-	sc = malloc(sizeof(struct evdev_cdev_softc), M_EVDEV,
-	    M_WAITOK | M_ZERO);
-	sc->ecs_evdev = evdev;
 
 	make_dev_args_init(&mda);
 	mda.mda_flags = MAKEDEV_WAITOK | MAKEDEV_CHECKNAME;
@@ -646,19 +614,17 @@ evdev_cdev_create(struct evdev_dev *evdev)
 	mda.mda_uid = UID_ROOT;
 	mda.mda_gid = GID_WHEEL;
 	mda.mda_mode = 0600;
-	mda.mda_si_drv1 = sc;
+	mda.mda_si_drv1 = evdev;
 
 	/* Try to coexist with cuse-backed input/event devices */
 	while ((ret = make_dev_s(&mda, &evdev->ev_cdev, "input/event%d", unit))
 	    == EEXIST)
 		unit++;
-	if (ret != 0) {
-		free(sc, M_EVDEV);
-		return (ret);
-	}
 
-	evdev->ev_unit = unit;
-	return (0);
+	if (ret == 0)
+		evdev->ev_unit = unit;
+
+	return (ret);
 }
 
 int
