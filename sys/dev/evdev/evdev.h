@@ -32,6 +32,7 @@
 #include <sys/queue.h>
 #include <sys/malloc.h>
 #include <sys/kbio.h>
+#include <sys/selinfo.h>
 #include <dev/evdev/input.h>
 #include <dev/kbd/kbdreg.h>
 
@@ -153,12 +154,19 @@ struct evdev_dev
 
 struct evdev_client
 {
+	struct evdev_dev *	ec_evdev;
 	struct mtx		ec_buffer_mtx;
 	size_t			ec_buffer_size;
 	size_t			ec_buffer_head;
 	size_t			ec_buffer_tail;
 	size_t			ec_buffer_ready;
 	enum evdev_clock_id	ec_clock_id;
+	struct selinfo		ec_selp;
+	struct sigio *		ec_sigio;
+	bool			ec_async;
+	bool			ec_revoked;
+	bool			ec_blocked;
+	bool			ec_selected;
 
 	evdev_client_event_t *	ec_ev_notify;
 	void *			ec_ev_arg;
