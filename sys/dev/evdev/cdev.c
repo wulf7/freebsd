@@ -50,6 +50,8 @@
 #define	debugf(fmt, args...)
 #endif
 
+#define	DEF_RING_REPORTS	8
+
 static int evdev_open(struct cdev *, int, int, struct thread *);
 static int evdev_read(struct cdev *, struct uio *, int);
 static int evdev_write(struct cdev *, struct uio *, int);
@@ -86,12 +88,25 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
+	size_t buffer_size;
 	int ret;
 
 	if (!evdev->ev_running)
 		return (ENODEV);
 
-	ret = evdev_register_client(evdev, &client);
+	/* Initialize client structure */
+	buffer_size = evdev->ev_report_size * DEF_RING_REPORTS;
+	client = malloc(offsetof(struct evdev_client, ec_buffer) +
+	    sizeof(struct input_event) * buffer_size,
+	    M_EVDEV, M_WAITOK | M_ZERO);
+
+	/* Initialize ring buffer */
+	client->ec_buffer_size = buffer_size;
+	client->ec_buffer_head = 0;
+	client->ec_buffer_tail = 0;
+	client->ec_buffer_ready = 0;
+
+	ret = evdev_register_client(evdev, client);
 	if (ret != 0) {
 		debugf("cdev: cannot register evdev client");
 		return (ret);
@@ -100,6 +115,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	client->ec_ev_notify = &evdev_notify_event;
 	client->ec_evdev = evdev;
 
+	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
 	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
 
 	devfs_set_cdevpriv(client, evdev_dtor);
@@ -116,6 +132,8 @@ evdev_dtor(void *data)
 	knlist_destroy(&client->ec_selp.si_note);
 	funsetown(&client->ec_sigio);
 	evdev_dispose_client(client->ec_evdev, client);
+	mtx_destroy(&client->ec_buffer_mtx);
+	free(client, M_EVDEV);
 }
 
 static int

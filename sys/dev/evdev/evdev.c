@@ -48,8 +48,6 @@
 #define	debugf(fmt, args...)
 #endif
 
-#define	DEF_RING_REPORTS	8
-
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
 static inline void set_bit(unsigned long *, int);
@@ -654,24 +652,8 @@ evdev_mt_sync(struct evdev_dev *evdev)
 }
 
 int
-evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
+evdev_register_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
-	struct evdev_client *client;
-	size_t buffer_size;
-
-	/* Initialize client structure */
-	buffer_size = evdev->ev_report_size * DEF_RING_REPORTS;
-	client = malloc(offsetof(struct evdev_client, ec_buffer) +
-	    sizeof(struct input_event) * buffer_size,
-	    M_EVDEV, M_WAITOK | M_ZERO);
-	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
-
-	/* Initialize ring buffer */
-	client->ec_buffer_size = buffer_size;
-	client->ec_buffer_head = 0;
-	client->ec_buffer_tail = 0;
-	client->ec_buffer_ready = 0;
-
 	debugf("adding new client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK(evdev);
@@ -683,7 +665,6 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 
 	LIST_INSERT_HEAD(&evdev->ev_clients, client, ec_link);
 	EVDEV_UNLOCK(evdev);
-	*clientp = client;
 	return (0);
 }
 
@@ -698,8 +679,6 @@ evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 	    evdev->ev_methods->ev_close != NULL)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
 	EVDEV_UNLOCK(evdev);
-	mtx_destroy(&client->ec_buffer_mtx);
-	free(client, M_EVDEV);
 	return (0);
 }
 
