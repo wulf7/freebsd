@@ -81,59 +81,47 @@ static struct filterops evdev_cdev_filterops = {
 	.f_event = evdev_kqread,
 };
 
-struct evdev_cdev_state
-{
-	struct evdev_client *	ecs_client;
-};
-
 static int
 evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
-	struct evdev_cdev_state *state;
+	struct evdev_client *client;
 	int ret;
 
 	if (!evdev->ev_running)
 		return (ENODEV);
 
-	state = malloc(sizeof(struct evdev_cdev_state), M_EVDEV, M_WAITOK | M_ZERO);
-	
-	ret = evdev_register_client(evdev, &state->ecs_client);
+	ret = evdev_register_client(evdev, &client);
 	if (ret != 0) {
-		free(state, M_EVDEV);
 		debugf("cdev: cannot register evdev client");
 		return (ret);
 	}
 
-	state->ecs_client->ec_ev_notify = &evdev_notify_event;
-	state->ecs_client->ec_ev_arg = state;
-	state->ecs_client->ec_evdev = evdev;
+	client->ec_ev_notify = &evdev_notify_event;
+	client->ec_evdev = evdev;
 
-	knlist_init_mtx(&state->ecs_client->ec_selp.si_note,
-	    &state->ecs_client->ec_buffer_mtx);
+	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
 
-	devfs_set_cdevpriv(state, evdev_dtor);
+	devfs_set_cdevpriv(client, evdev_dtor);
 	return (0);
 }
 
 static void
 evdev_dtor(void *data)
 {
-	struct evdev_cdev_state *state = (struct evdev_cdev_state *)data;
+	struct evdev_client *client = (struct evdev_client *)data;
 
-	knlist_clear(&state->ecs_client->ec_selp.si_note, 0);
-	seldrain(&state->ecs_client->ec_selp);
-	knlist_destroy(&state->ecs_client->ec_selp.si_note);
-	funsetown(&state->ecs_client->ec_sigio);
-	evdev_dispose_client(state->ecs_client->ec_evdev, state->ecs_client);
-	free(data, M_EVDEV);
+	knlist_clear(&client->ec_selp.si_note, 0);
+	seldrain(&client->ec_selp);
+	knlist_destroy(&client->ec_selp.si_note);
+	funsetown(&client->ec_sigio);
+	evdev_dispose_client(client->ec_evdev, client);
 }
 
 static int
 evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
-	struct evdev_cdev_state *state;
 	struct evdev_client *client;
 	struct input_event *event;
 	int ret = 0;
@@ -142,14 +130,12 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	debugf("cdev: read %ld bytes by thread %d", uio->uio_resid,
 	    uio->uio_td->td_tid);
 
-	ret = devfs_get_cdevpriv((void **)&state);
+	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || !evdev->ev_running)
 		return (ENODEV);
-
-	client = state->ecs_client;
 
 	/* Zero-sized reads are allowed for error checking */
 	if (uio->uio_resid != 0 && uio->uio_resid < sizeof(struct input_event))
@@ -164,7 +150,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 			ret = EWOULDBLOCK;
 		else {
 			if (remaining != 0) {
-				state->ecs_client->ec_blocked = true;
+				client->ec_blocked = true;
 				ret = mtx_sleep(client, &client->ec_buffer_mtx,
 				    PCATCH, "evread", 0);
 			}
@@ -190,17 +176,17 @@ static int
 evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
-	struct evdev_cdev_state *state;
+	struct evdev_client *client;
 	int ret = 0;
 	
 	debugf("cdev: write %ld bytes by thread %d", uio->uio_resid,
 	    uio->uio_td->td_tid);
 
-	ret = devfs_get_cdevpriv((void **)&state);
+	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	if (uio->uio_resid % sizeof(struct input_event) != 0) {
@@ -216,28 +202,25 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
-	struct evdev_cdev_state *state;
 	int ret;
 	int revents = 0;
 
 	debugf("cdev: poll by thread %d", td->td_tid);
 
-	ret = devfs_get_cdevpriv((void **)&state);
+	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (POLLNVAL);
 
-	if (state->ecs_client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || !evdev->ev_running)
 		return (POLLNVAL);
-
-	client = state->ecs_client;
 
 	if (events & (POLLIN | POLLRDNORM)) {
 		EVDEV_CLIENT_LOCKQ(client);
 		if (!EVDEV_CLIENT_EMPTYQ(client))
 			revents = events & (POLLIN | POLLRDNORM);
 		else {
-			state->ecs_client->ec_selected = true;
-			selrecord(td, &state->ecs_client->ec_selp);
+			client->ec_selected = true;
+			selrecord(td, &client->ec_selp);
 		}
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
@@ -249,14 +232,14 @@ static int
 evdev_kqfilter(struct cdev *dev, struct knote *kn)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
-	struct evdev_cdev_state *state;
+	struct evdev_client *client;
 	int ret;
 
-	ret = devfs_get_cdevpriv((void **)&state);
+	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	switch(kn->kn_filter) {
@@ -266,9 +249,9 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	default:
 		return(EINVAL);
 	}
-	kn->kn_hook = (caddr_t)state;
+	kn->kn_hook = (caddr_t)client;
 
-	knlist_add(&state->ecs_client->ec_selp.si_note, kn, 0);
+	knlist_add(&client->ec_selp.si_note, kn, 0);
 	return (0);
 }
 
@@ -276,11 +259,9 @@ static int
 evdev_kqread(struct knote *kn, long hint)
 {
 	struct evdev_client *client;
-	struct evdev_cdev_state *state;
 	int ret;
 
-	state = (struct evdev_cdev_state *)kn->kn_hook;
-	client = state->ecs_client;
+	client = (struct evdev_client *)kn->kn_hook;
 
 	EVDEV_CLIENT_LOCKQ(client);
 	ret = !EVDEV_CLIENT_EMPTYQ(client);
@@ -291,10 +272,10 @@ evdev_kqread(struct knote *kn, long hint)
 static void
 evdev_kqdetach(struct knote *kn)
 {
-	struct evdev_cdev_state *state;
+	struct evdev_client *client;
 
-	state = (struct evdev_cdev_state *)kn->kn_hook;
-	knlist_remove(&state->ecs_client->ec_selp.si_note, kn, 0);
+	client = (struct evdev_client *)kn->kn_hook;
+	knlist_remove(&client->ec_selp.si_note, kn, 0);
 }
 
 static int
@@ -302,27 +283,27 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
     struct thread *td)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
-	struct evdev_cdev_state *state;
+	struct evdev_client *client;
 	struct input_keymap_entry *ke;
 	int rep_params[2];
 	int ret, len, limit, type_num;
 	uint32_t code;
 	size_t nvalues;
 
-	ret = devfs_get_cdevpriv((void **)&state);
+	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
 
-	if (state->ecs_client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || !evdev->ev_running)
 		return (ENODEV);
 
 	/* file I/O ioctl handling */
 	switch (cmd) {
 	case FIOSETOWN:
-		return (fsetown(*(int *)data, &state->ecs_client->ec_sigio));
+		return (fsetown(*(int *)data, &client->ec_sigio));
 
 	case FIOGETOWN:
-		*(int *)data = fgetown(&state->ecs_client->ec_sigio);
+		*(int *)data = fgetown(&client->ec_sigio);
 		return (0);
 
 	case FIONBIO:
@@ -330,9 +311,9 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	case FIOASYNC:
 		if (*(int *)data)
-			state->ecs_client->ec_async = true;
+			client->ec_async = true;
 		else
-			state->ecs_client->ec_async = false;
+			client->ec_async = false;
 
 		return (0);
 	}
@@ -421,9 +402,9 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	case EVIOCGRAB:
 		EVDEV_LOCK(evdev);
 		if (*(int *)data)
-			ret = evdev_grab_client(evdev, state->ecs_client);
+			ret = evdev_grab_client(evdev, client);
 		else
-			ret = evdev_release_client(evdev, state->ecs_client);
+			ret = evdev_release_client(evdev, client);
 		EVDEV_UNLOCK(evdev);
 		return (ret);
 
@@ -431,16 +412,16 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (*(int *)data != 0)
 			return (EINVAL);
 
-		state->ecs_client->ec_revoked = true;
+		client->ec_revoked = true;
 		return (0);
 
 	case EVIOCSCLOCKID:
 		switch (*(int *)data) {
 		case CLOCK_REALTIME:
-			state->ecs_client->ec_clock_id = EV_CLOCK_REALTIME;
+			client->ec_clock_id = EV_CLOCK_REALTIME;
 			return (0);
 		case CLOCK_MONOTONIC:
-			state->ecs_client->ec_clock_id = EV_CLOCK_MONOTONIC;
+			client->ec_clock_id = EV_CLOCK_MONOTONIC;
 			return (0);
 		default:
 			return (EINVAL);
@@ -486,25 +467,25 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGKEY(0):
-		evdev_client_filter_queue(state->ecs_client, EV_KEY);
+		evdev_client_filter_queue(client, EV_KEY);
 		limit = MIN(len, howmany(KEY_CNT, 8));
 		memcpy(data, evdev->ev_key_states, limit);
 		return (0);
 
 	case EVIOCGLED(0):
-		evdev_client_filter_queue(state->ecs_client, EV_LED);
+		evdev_client_filter_queue(client, EV_LED);
 		limit = MIN(len, howmany(LED_CNT, 8));
 		memcpy(data, evdev->ev_led_states, limit);
 		return (0);
 
 	case EVIOCGSND(0):
-		evdev_client_filter_queue(state->ecs_client, EV_SND);
+		evdev_client_filter_queue(client, EV_SND);
 		limit = MIN(len, howmany(SND_CNT, 8));
 		memcpy(data, evdev->ev_snd_states, limit);
 		return (0);
 
 	case EVIOCGSW(0):
-		evdev_client_filter_queue(state->ecs_client, EV_SW);
+		evdev_client_filter_queue(client, EV_SW);
 		limit = MIN(len, howmany(SW_CNT, 8));
 		memcpy(data, evdev->ev_sw_states, limit);
 		return (0);
@@ -583,20 +564,19 @@ evdev_ioctl_eviocgbit(struct evdev_dev *evdev, int type, int len, caddr_t data)
 static void
 evdev_notify_event(struct evdev_client *client, void *data)
 {
-	struct evdev_cdev_state *state = (struct evdev_cdev_state *)data;
 
-	if (state->ecs_client->ec_blocked) {
-		state->ecs_client->ec_blocked = false;
+	if (client->ec_blocked) {
+		client->ec_blocked = false;
 		wakeup(client);
 	}
-	if (state->ecs_client->ec_selected) {
-		state->ecs_client->ec_selected = false;
-		selwakeup(&state->ecs_client->ec_selp);
+	if (client->ec_selected) {
+		client->ec_selected = false;
+		selwakeup(&client->ec_selp);
 	}
-	KNOTE_LOCKED(&state->ecs_client->ec_selp.si_note, 0);
+	KNOTE_LOCKED(&client->ec_selp.si_note, 0);
 
-	if (state->ecs_client->ec_async && state->ecs_client->ec_sigio != NULL)
-		pgsigio(&state->ecs_client->ec_sigio, SIGIO, 0);
+	if (client->ec_async && client->ec_sigio != NULL)
+		pgsigio(&client->ec_sigio, SIGIO, 0);
 }
 
 int
