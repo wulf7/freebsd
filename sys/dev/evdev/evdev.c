@@ -665,7 +665,6 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 	    sizeof(struct input_event) * buffer_size,
 	    M_EVDEV, M_WAITOK | M_ZERO);
 	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
-	client->ec_evdev = evdev;
 
 	/* Initialize ring buffer */
 	client->ec_buffer_size = buffer_size;
@@ -689,10 +688,8 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 }
 
 int
-evdev_dispose_client(struct evdev_client *client)
+evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
-	struct evdev_dev *evdev = client->ec_evdev;
-
 	debugf("removing client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK(evdev);
@@ -707,9 +704,8 @@ evdev_dispose_client(struct evdev_client *client)
 }
 
 int
-evdev_grab_client(struct evdev_client *client)
+evdev_grab_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
-	struct evdev_dev *evdev = client->ec_evdev;
 
 	EVDEV_LOCK_ASSERT(evdev);
 
@@ -722,9 +718,8 @@ evdev_grab_client(struct evdev_client *client)
 }
 
 int
-evdev_release_client(struct evdev_client *client)
+evdev_release_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
-	struct evdev_dev *evdev = client->ec_evdev;
 
 	EVDEV_LOCK_ASSERT(evdev);
 
@@ -834,8 +829,7 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 
 	/* If queue is full drop its content and place SYN_DROPPED event */
 	if ((tail + 1) % count == head) {
-		debugf("client %p for device %s: buffer overflow", client,
-		    client->ec_evdev->ev_shortname);
+		debugf("client %p: buffer overflow", client);
 
 		head = (tail + count - 1) % count;
 		client->ec_buffer[head] = (struct input_event) {
@@ -882,7 +876,6 @@ evdev_client_dumpqueue(struct evdev_client *client)
 	size = client->ec_buffer_size;
 
 	printf("evdev client: %p\n", client);
-	printf("evdev provider name: %s\n", client->ec_evdev->ev_name);
 	printf("event queue: head=%zu ready=%zu tail=%zu size=%zu\n",
 	    head, ready, tail, size);
 

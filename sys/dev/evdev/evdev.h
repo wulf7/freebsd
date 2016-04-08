@@ -153,7 +153,6 @@ struct evdev_dev
 
 struct evdev_client
 {
-	struct evdev_dev *	ec_evdev;
 	struct mtx		ec_buffer_mtx;
 	size_t			ec_buffer_size;
 	size_t			ec_buffer_head;
@@ -209,9 +208,9 @@ int evdev_set_report_size(struct evdev_dev *, size_t);
 
 /* Client interface: */
 int evdev_register_client(struct evdev_dev *, struct evdev_client **);
-int evdev_dispose_client(struct evdev_client *);
-int evdev_grab_client(struct evdev_client *);
-int evdev_release_client(struct evdev_client *);
+int evdev_dispose_client(struct evdev_dev *, struct evdev_client *);
+int evdev_grab_client(struct evdev_dev *, struct evdev_client *);
+int evdev_release_client(struct evdev_dev *, struct evdev_client *);
 void evdev_client_filter_queue(struct evdev_client *, uint16_t);
 
 /* Utility functions: */

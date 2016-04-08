@@ -83,6 +83,7 @@ static struct filterops evdev_cdev_filterops = {
 
 struct evdev_cdev_state
 {
+	struct evdev_dev *	ecs_evdev;
 	struct mtx		ecs_mtx;
 	struct evdev_client *	ecs_client;
 	struct selinfo		ecs_selp;
@@ -114,6 +115,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 
 	state->ecs_client->ec_ev_notify = &evdev_notify_event;
 	state->ecs_client->ec_ev_arg = state;
+	state->ecs_evdev = evdev;
 
 	knlist_init_mtx(&state->ecs_selp.si_note,
 	    &state->ecs_client->ec_buffer_mtx);
@@ -131,7 +133,7 @@ evdev_dtor(void *data)
 	seldrain(&state->ecs_selp);
 	knlist_destroy(&state->ecs_selp.si_note);
 	funsetown(&state->ecs_sigio);
-	evdev_dispose_client(state->ecs_client);
+	evdev_dispose_client(state->ecs_evdev, state->ecs_client);
 	free(data, M_EVDEV);
 }
 
@@ -427,9 +429,9 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	case EVIOCGRAB:
 		EVDEV_LOCK(evdev);
 		if (*(int *)data)
-			ret = evdev_grab_client(state->ecs_client);
+			ret = evdev_grab_client(evdev, state->ecs_client);
 		else
-			ret = evdev_release_client(state->ecs_client);
+			ret = evdev_release_client(evdev, state->ecs_client);
 		EVDEV_UNLOCK(evdev);
 		return (ret);
 
