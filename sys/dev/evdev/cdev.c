@@ -84,7 +84,6 @@ static struct filterops evdev_cdev_filterops = {
 struct evdev_cdev_state
 {
 	struct evdev_dev *	ecs_evdev;
-	struct mtx		ecs_mtx;
 	struct evdev_client *	ecs_client;
 	struct selinfo		ecs_selp;
 	struct sigio *		ecs_sigio;
