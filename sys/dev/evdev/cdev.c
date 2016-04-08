@@ -425,10 +425,13 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGRAB:
+		EVDEV_LOCK(evdev);
 		if (*(int *)data)
-			return (evdev_grab_client(state->ecs_client));
+			ret = evdev_grab_client(state->ecs_client);
 		else
-			return (evdev_release_client(state->ecs_client));
+			ret = evdev_release_client(state->ecs_client);
+		EVDEV_UNLOCK(evdev);
+		return (ret);
 
 	case EVIOCREVOKE:
 		if (*(int *)data != 0)

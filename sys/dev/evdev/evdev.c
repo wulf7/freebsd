@@ -605,7 +605,7 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	/* Propagate event through all clients */
 	EVDEV_LOCK(evdev);
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
-		if (!client->ec_enabled)
+		if (evdev->ev_grabber != NULL && evdev->ev_grabber != client)
 			continue;
 
 		EVDEV_CLIENT_LOCKQ(client);
@@ -672,7 +672,6 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client **clientp)
 	client->ec_buffer_head = 0;
 	client->ec_buffer_tail = 0;
 	client->ec_buffer_ready = 0;
-	client->ec_enabled = true;
 
 	debugf("adding new client for device %s", evdev->ev_shortname);
 
@@ -711,23 +710,14 @@ int
 evdev_grab_client(struct evdev_client *client)
 {
 	struct evdev_dev *evdev = client->ec_evdev;
-	struct evdev_client *iter;
 
-	EVDEV_LOCK(evdev);
-	if (evdev->ev_grabbed) {
-		EVDEV_UNLOCK(evdev);
+	EVDEV_LOCK_ASSERT(evdev);
+
+	if (evdev->ev_grabber != NULL)
 		return (EBUSY);
-	}
 
-	evdev->ev_grabbed = true;
+	evdev->ev_grabber = client;
 
-	/* Disable all other clients */
-	LIST_FOREACH(iter, &evdev->ev_clients, ec_link) {
-		if (iter != client)
-			iter->ec_enabled = false;
-	}
-
-	EVDEV_UNLOCK(evdev);
 	return (0);
 }
 
@@ -735,22 +725,14 @@ int
 evdev_release_client(struct evdev_client *client)
 {
 	struct evdev_dev *evdev = client->ec_evdev;
-	struct evdev_client *iter;
 
-	EVDEV_LOCK(evdev);
-	if (!evdev->ev_grabbed) {
-		EVDEV_UNLOCK(evdev);
+	EVDEV_LOCK_ASSERT(evdev);
+
+	if (evdev->ev_grabber != client)
 		return (EINVAL);
-	}
 
-	evdev->ev_grabbed = false;
+	evdev->ev_grabber = NULL;
 
-	/* Enable all other clients */
-	LIST_FOREACH(iter, &evdev->ev_clients, ec_link) {
-		iter->ec_enabled = true;
-	}
-
-	EVDEV_UNLOCK(evdev);
 	return (0);
 }
 

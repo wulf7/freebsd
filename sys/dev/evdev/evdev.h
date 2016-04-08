@@ -106,7 +106,7 @@ struct evdev_dev
 	int			ev_unit;
 	struct mtx		ev_mtx;
 	struct input_id		ev_id;
-	bool			ev_grabbed;
+	struct evdev_client *	ev_grabber;
 	bool			ev_running;
 	size_t			ev_report_size;
 
@@ -147,8 +147,9 @@ struct evdev_dev
 	LIST_HEAD(, evdev_client) ev_clients;
 };
 
-#define	EVDEV_LOCK(evdev)	mtx_lock(&(evdev)->ev_mtx)
-#define	EVDEV_UNLOCK(evdev)	mtx_unlock(&(evdev)->ev_mtx)
+#define	EVDEV_LOCK(evdev)		mtx_lock(&(evdev)->ev_mtx)
+#define	EVDEV_UNLOCK(evdev)		mtx_unlock(&(evdev)->ev_mtx)
+#define	EVDEV_LOCK_ASSERT(evdev)	mtx_assert(&(evdev)->ev_mtx, MA_OWNED)
 
 struct evdev_client
 {
@@ -158,8 +159,6 @@ struct evdev_client
 	size_t			ec_buffer_head;
 	size_t			ec_buffer_tail;
 	size_t			ec_buffer_ready;
-	bool			ec_enabled;
-	bool			ec_stall;
 	enum evdev_clock_id	ec_clock_id;
 
 	evdev_client_event_t *	ec_ev_notify;
