@@ -702,6 +702,7 @@ evdev_dispose_client(struct evdev_client *client)
 	    evdev->ev_methods->ev_close != NULL)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
 	EVDEV_UNLOCK(evdev);
+	mtx_destroy(&client->ec_buffer_mtx);
 	free(client, M_EVDEV);
 	return (0);
 }
