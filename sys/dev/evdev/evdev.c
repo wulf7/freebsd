@@ -225,7 +225,6 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	}
 
 	/* Create char device node */
-	evdev->ev_running = true;
 	ret = evdev_cdev_create(evdev);
 bail_out:
 	if (ret != 0)
@@ -242,7 +241,7 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 	device_printf(dev, "unregistered evdev provider: %s\n", evdev->ev_name);
 
 	EVDEV_LOCK(evdev);
-	evdev->ev_running = false;
+	evdev->ev_cdev->si_drv1 = NULL;
 	/* Wake up sleepers */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		EVDEV_CLIENT_LOCKQ(client);

@@ -91,7 +91,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	size_t buffer_size;
 	int ret;
 
-	if (!evdev->ev_running)
+	if (evdev == NULL)
 		return (ENODEV);
 
 	/* Initialize client structure */
@@ -151,7 +151,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || evdev == NULL)
 		return (ENODEV);
 
 	/* Zero-sized reads are allowed for error checking */
@@ -203,7 +203,7 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || evdev == NULL)
 		return (ENODEV);
 
 	if (uio->uio_resid % sizeof(struct input_event) != 0) {
@@ -228,7 +228,7 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 	if (ret != 0)
 		return (POLLNVAL);
 
-	if (client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || evdev == NULL)
 		return (POLLNVAL);
 
 	if (events & (POLLIN | POLLRDNORM)) {
@@ -256,7 +256,7 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || evdev == NULL)
 		return (ENODEV);
 
 	switch(kn->kn_filter) {
@@ -311,7 +311,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || !evdev->ev_running)
+	if (client->ec_revoked || evdev == NULL)
 		return (ENODEV);
 
 	/* file I/O ioctl handling */

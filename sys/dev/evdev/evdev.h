@@ -108,7 +108,6 @@ struct evdev_dev
 	struct mtx		ev_mtx;
 	struct input_id		ev_id;
 	struct evdev_client *	ev_grabber;
-	bool			ev_running;
 	size_t			ev_report_size;
 
 	/* Supported features: */
