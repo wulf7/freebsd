@@ -52,16 +52,16 @@
 
 #define	DEF_RING_REPORTS	8
 
-static int evdev_open(struct cdev *, int, int, struct thread *);
-static int evdev_read(struct cdev *, struct uio *, int);
-static int evdev_write(struct cdev *, struct uio *, int);
-static int evdev_ioctl(struct cdev *, u_long, caddr_t, int, struct thread *);
-static int evdev_poll(struct cdev *, int, struct thread *);
-static int evdev_kqfilter(struct cdev *, struct knote *);
+static d_open_t		evdev_open;
+static d_read_t		evdev_read;
+static d_write_t	evdev_write;
+static d_ioctl_t	evdev_ioctl;
+static d_poll_t		evdev_poll;
+static d_kqfilter_t	evdev_kqfilter;
+
 static int evdev_kqread(struct knote *kn, long hint);
 static void evdev_kqdetach(struct knote *kn);
 static void evdev_dtor(void *);
-
 static int evdev_ioctl_eviocgbit(struct evdev_dev *, int, int, caddr_t);
 static void evdev_client_filter_queue(struct evdev_client *, uint16_t);
 
