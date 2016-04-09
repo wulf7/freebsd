@@ -673,6 +673,7 @@ evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_close != NULL)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
+	evdev_release_client(evdev, client);
 	EVDEV_UNLOCK(evdev);
 	return (0);
 }
