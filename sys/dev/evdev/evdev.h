@@ -168,9 +168,6 @@ struct evdev_client
 	bool			ec_blocked;
 	bool			ec_selected;
 
-	evdev_client_event_t *	ec_ev_notify;
-	void *			ec_ev_arg;
-
 	LIST_ENTRY(evdev_client) ec_link;
 
 	struct input_event	ec_buffer[];
@@ -220,6 +217,7 @@ int evdev_dispose_client(struct evdev_dev *, struct evdev_client *);
 int evdev_grab_client(struct evdev_dev *, struct evdev_client *);
 int evdev_release_client(struct evdev_dev *, struct evdev_client *);
 void evdev_client_push(struct evdev_client *, uint16_t, uint16_t, int32_t);
+void evdev_notify_event(struct evdev_client *);
 
 /* Utility functions: */
 uint16_t evdev_hid2key(int);

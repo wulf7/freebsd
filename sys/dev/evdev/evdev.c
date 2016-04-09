@@ -246,8 +246,7 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 	/* Wake up sleepers */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		EVDEV_CLIENT_LOCKQ(client);
-		if (client->ec_ev_notify != NULL)
-			client->ec_ev_notify(client, client->ec_ev_arg);
+		evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 	EVDEV_UNLOCK(evdev);
@@ -611,9 +610,8 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			    EV_ABS, ABS_MT_SLOT, postponed_mt_slot);
 		evdev_client_push(client, type, code, value);
 
-		if (client->ec_ev_notify != NULL &&
-		    type == EV_SYN && code == SYN_REPORT)
-			client->ec_ev_notify(client, client->ec_ev_arg);
+		if (type == EV_SYN && code == SYN_REPORT)
+			evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 	EVDEV_UNLOCK(evdev);

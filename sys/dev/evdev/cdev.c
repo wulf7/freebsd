@@ -62,7 +62,6 @@ static int evdev_kqread(struct knote *kn, long hint);
 static void evdev_kqdetach(struct knote *kn);
 static void evdev_dtor(void *);
 
-static void evdev_notify_event(struct evdev_client *, void *);
 static int evdev_ioctl_eviocgbit(struct evdev_dev *, int, int, caddr_t);
 static void evdev_client_filter_queue(struct evdev_client *, uint16_t);
 
@@ -113,7 +112,6 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 		return (ret);
 	}
 
-	client->ec_ev_notify = &evdev_notify_event;
 	client->ec_evdev = evdev;
 
 	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
@@ -580,8 +578,8 @@ evdev_ioctl_eviocgbit(struct evdev_dev *evdev, int type, int len, caddr_t data)
 	return (0);
 }
 
-static void
-evdev_notify_event(struct evdev_client *client, void *data)
+void
+evdev_notify_event(struct evdev_client *client)
 {
 
 	if (client->ec_blocked) {
