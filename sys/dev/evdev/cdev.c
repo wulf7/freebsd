@@ -117,8 +117,11 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
 	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
 
-	devfs_set_cdevpriv(client, evdev_dtor);
-	return (0);
+	ret = devfs_set_cdevpriv(client, evdev_dtor);
+	if (ret != 0)
+		evdev_dtor(client);
+
+	return (ret);
 }
 
 static void
