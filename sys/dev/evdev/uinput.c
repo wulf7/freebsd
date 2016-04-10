@@ -48,12 +48,11 @@
 #define	debugf(fmt, args...)
 #endif
 
-static int uinput_open(struct cdev *, int, int, struct thread *);
-static int uinput_close(struct cdev *, int, int, struct thread *);
-static int uinput_read(struct cdev *, struct uio *, int);
-static int uinput_write(struct cdev *, struct uio *, int);
-static int uinput_ioctl(struct cdev *, u_long, caddr_t, int, struct thread *);
-static int uinput_poll(struct cdev *, int, struct thread *);
+static d_open_t		uinput_open;
+static d_read_t		uinput_read;
+static d_write_t	uinput_write;
+static d_ioctl_t	uinput_ioctl;
+static d_poll_t		uinput_poll;
 static void uinput_dtor(void *);
 
 static int uinput_setup_provider(struct evdev_dev *, struct uinput_user_dev *);
@@ -62,25 +61,16 @@ static int uinput_cdev_create(void);
 static struct cdevsw uinput_cdevsw = {
 	.d_version = D_VERSION,
 	.d_open = uinput_open,
-	.d_close = uinput_close,
 	.d_read = uinput_read,
 	.d_write = uinput_write,
 	.d_ioctl = uinput_ioctl,
 	.d_poll = uinput_poll,
 	.d_name = "uinput",
-	.d_flags = D_TRACKCLOSE,
 };
 
 static struct evdev_methods uinput_ev_methods = {
 	.ev_open = NULL,
 	.ev_close = NULL,
-};
-
-struct uinput_cdev_softc
-{
-	int			ucs_open_count;
-
-	LIST_ENTRY(uinput_cdev_softc) ucs_link;
 };
 
 struct uinput_cdev_state
@@ -99,15 +89,6 @@ uinput_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	state->ucs_evdev = evdev_alloc();
 
 	devfs_set_cdevpriv(state, uinput_dtor);
-	return (0);
-}
-
-static int
-uinput_close(struct cdev *dev, int fflag, int devtype, struct thread *td)
-{
-	struct uinput_cdev_softc *sc = dev->si_drv1;
-
-	sc->ucs_open_count--;
 	return (0);
 }
 
@@ -337,18 +318,14 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 static int
 uinput_cdev_create(void)
 {
-	struct uinput_cdev_softc *sc;
 	struct make_dev_args mda;
 	struct cdev *cdev;
-
-	sc = malloc(sizeof(struct uinput_cdev_softc), M_EVDEV, M_WAITOK | M_ZERO);
 
 	make_dev_args_init(&mda);
 	mda.mda_devsw = &uinput_cdevsw;
 	mda.mda_uid = UID_ROOT;
 	mda.mda_gid = GID_WHEEL;
 	mda.mda_mode = 0600;
-	mda.mda_si_drv1 = sc;
 
 	make_dev_s(&mda, &cdev, "uinput");
 
