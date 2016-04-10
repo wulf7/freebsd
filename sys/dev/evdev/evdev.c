@@ -649,21 +649,23 @@ evdev_mt_sync(struct evdev_dev *evdev)
 int
 evdev_register_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
+	int ret = 0;
+
 	debugf("adding new client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK(evdev);
 	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_open != NULL) {
 		debugf("calling ev_open() on device %s", evdev->ev_shortname);
-		evdev->ev_methods->ev_open(evdev, evdev->ev_softc);
+		ret = evdev->ev_methods->ev_open(evdev, evdev->ev_softc);
 	}
-
-	LIST_INSERT_HEAD(&evdev->ev_clients, client, ec_link);
+	if (ret == 0)
+		LIST_INSERT_HEAD(&evdev->ev_clients, client, ec_link);
 	EVDEV_UNLOCK(evdev);
-	return (0);
+	return (ret);
 }
 
-int
+void
 evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
 	debugf("removing client for device %s", evdev->ev_shortname);
@@ -675,7 +677,6 @@ evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
 	evdev_release_client(evdev, client);
 	EVDEV_UNLOCK(evdev);
-	return (0);
 }
 
 int

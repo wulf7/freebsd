@@ -106,13 +106,13 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	client->ec_buffer_tail = 0;
 	client->ec_buffer_ready = 0;
 
+	client->ec_evdev = evdev;
 	ret = evdev_register_client(evdev, client);
 	if (ret != 0) {
 		debugf("cdev: cannot register evdev client");
+		free(client, M_EVDEV);
 		return (ret);
 	}
-
-	client->ec_evdev = evdev;
 
 	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
 	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
