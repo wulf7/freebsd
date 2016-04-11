@@ -140,7 +140,8 @@ evdev_dtor(void *data)
 	knlist_destroy(&client->ec_selp.si_note);
 	funsetown(&client->ec_sigio);
 	EVDEV_LOCK(client->ec_evdev);
-	evdev_dispose_client(client->ec_evdev, client);
+	if (!client->ec_revoked)
+		evdev_dispose_client(client->ec_evdev, client);
 	EVDEV_UNLOCK(client->ec_evdev);
 	mtx_destroy(&client->ec_buffer_mtx);
 	free(client, M_EVDEV);
@@ -440,7 +441,11 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (*(int *)data != 0)
 			return (EINVAL);
 
+		EVDEV_LOCK(evdev);
+		if (dev->si_drv1 != NULL && !client->ec_revoked)
+			evdev_dispose_client(evdev, client);
 		client->ec_revoked = true;
+		EVDEV_UNLOCK(evdev);
 		return (0);
 
 	case EVIOCSCLOCKID:
