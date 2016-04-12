@@ -206,6 +206,7 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
+	struct input_event event;
 	int ret = 0;
 	
 	debugf("cdev: write %ld bytes by thread %d", uio->uio_resid,
@@ -223,7 +224,14 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 		return (EINVAL);
 	}
 
-	return (0);
+	while (uio->uio_resid > 0 && ret == 0) {
+		ret = uiomove(&event, sizeof(struct input_event), uio);
+		if (ret == 0)
+			ret = evdev_inject_event(evdev, event.type, event.code,
+			    event.value);
+	}
+
+	return (ret);
 }
 
 static int

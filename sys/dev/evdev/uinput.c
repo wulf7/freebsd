@@ -48,6 +48,8 @@
 #define	debugf(fmt, args...)
 #endif
 
+static evdev_event_t	uinput_ev_event;
+
 static d_open_t		uinput_open;
 static d_read_t		uinput_read;
 static d_write_t	uinput_write;
@@ -71,6 +73,7 @@ static struct cdevsw uinput_cdevsw = {
 static struct evdev_methods uinput_ev_methods = {
 	.ev_open = NULL,
 	.ev_close = NULL,
+	.ev_event = uinput_ev_event,
 };
 
 struct uinput_cdev_state
@@ -79,6 +82,30 @@ struct uinput_cdev_state
 	struct evdev_dev *	ucs_evdev;
 	struct mtx		ucs_mtx;
 };
+
+static void
+uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
+    uint16_t code, int32_t value)
+{
+	switch (type) {
+	case EV_LED:
+		evdev_push_event(evdev, EV_LED, code, value);
+		break;
+
+	case EV_REP:
+		if (code == REP_DELAY) {
+			evdev_set_repeat_params(evdev, REP_DELAY, value);
+			evdev_push_event(evdev, EV_REP, REP_DELAY, value);
+		} else if (code == REP_PERIOD) {
+			evdev_set_repeat_params(evdev, REP_PERIOD, value);
+			evdev_push_event(evdev, EV_REP, REP_PERIOD, value);
+		}
+		break;
+
+	default:
+		break;
+	}
+}
 
 static int
 uinput_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
@@ -161,8 +188,8 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 
 		while (uio->uio_resid > 0) {
 			uiomove(&event, sizeof(struct input_event), uio);
-			ret = evdev_push_event(state->ucs_evdev, event.type, event.code,
-			    event.value);
+			ret = evdev_inject_event(state->ucs_evdev, event.type,
+			    event.code, event.value);
 
 			if (ret != 0)
 				return (ret);

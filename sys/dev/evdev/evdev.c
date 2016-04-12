@@ -622,13 +622,41 @@ int
 evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
+	int ret = 0;
 
-	if (evdev->ev_methods->ev_event != NULL) {
-		evdev->ev_methods->ev_event(evdev, evdev->ev_softc, type,
-		    code, value);
+	switch (type) {
+	case EV_LED:
+	case EV_REP:
+	case EV_MSC:
+	case EV_SND:
+	case EV_FF:
+		if (evdev->ev_methods != NULL &&
+		    evdev->ev_methods->ev_event != NULL)
+			evdev->ev_methods->ev_event(evdev, evdev->ev_softc,
+			    type, code, value);
+		/*
+		 * Leds and repeats should be reported in ev_event method body
+		 * to interoperate with kbdmux states and rates propagation and
+		 * both (ioctl and evdev) ways of changing it will results in
+		 * only one evdev event reported to client.
+		 */
+		if (type == EV_LED || type == EV_REP)
+			break;
+		/* FALLTHROUGH */
+
+	case EV_SYN:
+	case EV_KEY:
+	case EV_REL:
+	case EV_ABS:
+	case EV_SW:
+		ret = evdev_push_event(evdev, type,  code, value);
+		break;
+
+	default:
+		ret = EINVAL;
 	}
 
-	return (0);
+	return (ret);
 }
 
 inline int
