@@ -87,24 +87,8 @@ static void
 uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
     uint16_t code, int32_t value)
 {
-	switch (type) {
-	case EV_LED:
-		evdev_push_event(evdev, EV_LED, code, value);
-		break;
-
-	case EV_REP:
-		if (code == REP_DELAY) {
-			evdev_set_repeat_params(evdev, REP_DELAY, value);
-			evdev_push_event(evdev, EV_REP, REP_DELAY, value);
-		} else if (code == REP_PERIOD) {
-			evdev_set_repeat_params(evdev, REP_PERIOD, value);
-			evdev_push_event(evdev, EV_REP, REP_PERIOD, value);
-		}
-		break;
-
-	default:
-		break;
-	}
+	if (type == EV_LED)
+		evdev_push_event(evdev, type, code, value);
 }
 
 static int

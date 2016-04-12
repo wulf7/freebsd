@@ -296,8 +296,6 @@ evdev_push_repeats(struct evdev_dev *evdev, keyboard_t *kbd)
 	if (evdev == NULL)
 		return;
 
-	evdev_set_repeat_params(evdev, REP_DELAY, kbd->kb_delay1);
-	evdev_set_repeat_params(evdev, REP_PERIOD, kbd->kb_delay2);
 	evdev_push_event(evdev, EV_REP, REP_DELAY, kbd->kb_delay1);
 	evdev_push_event(evdev, EV_REP, REP_PERIOD, kbd->kb_delay2);
 }

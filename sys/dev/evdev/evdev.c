@@ -499,6 +499,11 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			return (EINVAL);
 		break;
 
+	case EV_REP:
+		if (code >= REP_CNT)
+			return (EINVAL);
+		break;
+
 	default:
 		return (EINVAL);
 	}
@@ -553,6 +558,12 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		if (get_bit(evdev->ev_sw_states, code) == value)
 			return (0);
 		change_bit(evdev->ev_sw_states, code, value);
+		break;
+
+	case EV_REP:
+		if (evdev->ev_rep[code] == value)
+			return (0);
+		evdev_set_repeat_params(evdev, code, value);
 		break;
 
 	/* For EV_ABS, save last value in absinfo and ev_mt_states */
@@ -625,8 +636,12 @@ evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	int ret = 0;
 
 	switch (type) {
-	case EV_LED:
 	case EV_REP:
+		/* evdev repeats should not be processed by hardware driver */
+		if (!evdev->ev_rep_driver)
+			goto push;
+		/* FALLTHROUGH */
+	case EV_LED:
 	case EV_MSC:
 	case EV_SND:
 	case EV_FF:
@@ -635,20 +650,20 @@ evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			evdev->ev_methods->ev_event(evdev, evdev->ev_softc,
 			    type, code, value);
 		/*
-		 * Leds and repeats should be reported in ev_event method body
-		 * to interoperate with kbdmux states and rates propagation and
-		 * both (ioctl and evdev) ways of changing it will results in
-		 * only one evdev event reported to client.
+		 * Leds and driver repeats should be reported in ev_event
+		 * method body to interoperate with kbdmux states and rates
+		 * propagation so both ways (ioctl and evdev) of changing it
+		 * will produce only one evdev event report to client.
 		 */
 		if (type == EV_LED || type == EV_REP)
 			break;
 		/* FALLTHROUGH */
-
 	case EV_SYN:
 	case EV_KEY:
 	case EV_REL:
 	case EV_ABS:
 	case EV_SW:
+push:
 		ret = evdev_push_event(evdev, type,  code, value);
 		break;
 

@@ -322,7 +322,6 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
 	struct input_keymap_entry *ke;
-	int rep_params[2];
 	int ret, len, limit, type_num;
 	uint32_t code;
 	size_t nvalues;
@@ -375,23 +374,16 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (!evdev_event_supported(evdev, EV_REP))
 			return (ENOTSUP);
 
-		rep_params[0] = evdev->ev_rep[REP_DELAY];
-		rep_params[1] = evdev->ev_rep[REP_PERIOD];
-		memcpy(data, rep_params, sizeof(rep_params));
+		memcpy(data, evdev->ev_rep, sizeof(evdev->ev_rep));
 		return (0);
 
 	case EVIOCSREP:
 		if (!evdev_event_supported(evdev, EV_REP))
 			return (ENOTSUP);
 
-		memcpy(rep_params, data, sizeof(rep_params));
-		evdev->ev_rep[REP_DELAY] = rep_params[0];
-		evdev->ev_rep[REP_PERIOD] = rep_params[1];
-
-		if (evdev->ev_rep_driver) {
-			evdev_inject_event(evdev, EV_REP, REP_DELAY, rep_params[0]);
-			evdev_inject_event(evdev, EV_REP, REP_PERIOD, rep_params[1]);
-		}
+		evdev_inject_event(evdev, EV_REP, REP_DELAY, ((int *)data)[0]);
+		evdev_inject_event(evdev, EV_REP, REP_PERIOD,
+		    ((int *)data)[1]);
 		return (0);
 
 	case EVIOCGKEYCODE:
