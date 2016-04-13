@@ -219,6 +219,7 @@ uinput_create_keyboard(bthid_session_p const s)
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_LED) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_SYN) < 0 ||
+	    ioctl(s->uinput, UI_SET_EVBIT, EV_REP) < 0 ||
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_CAPSL) < 0 ||
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_NUML) < 0 ||
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_SCROLLL) < 0 ||

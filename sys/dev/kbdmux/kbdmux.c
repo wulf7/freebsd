@@ -522,6 +522,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_support_event(evdev, EV_SYN);
 		evdev_support_event(evdev, EV_KEY);
 		evdev_support_event(evdev, EV_LED);
+		evdev_support_repeat(evdev, EVDEV_REPEAT);
 		evdev_support_all_known_keys(evdev);
 		evdev_support_led(evdev, LED_NUML);
 		evdev_support_led(evdev, LED_CAPSL);
