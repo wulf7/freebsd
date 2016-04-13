@@ -126,6 +126,7 @@ struct evdev_dev
 	int			ev_rep[REP_CNT];
 	struct callout		ev_rep_callout;
 	bool			ev_rep_driver;
+	uint16_t		ev_rep_key;
 
 	/* State: */
 	unsigned long		ev_key_states[nlongs(KEY_CNT)];

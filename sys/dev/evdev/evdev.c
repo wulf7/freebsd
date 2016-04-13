@@ -55,10 +55,8 @@ static inline void clr_bit(unsigned long *, int);
 static inline void change_bit(unsigned long *, int, int);
 static inline int get_bit(unsigned long *, int);
 static void evdev_assign_id(struct evdev_dev *);
-#if 0
-static void evdev_start_repeat(struct evdev_dev *, int32_t);
+static void evdev_start_repeat(struct evdev_dev *, uint16_t);
 static void evdev_stop_repeat(struct evdev_dev *);
-#endif
 static int evdev_check_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 
 static inline void
@@ -249,6 +247,9 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 	EVDEV_UNLOCK(evdev);
+
+	if (evdev_event_supported(evdev, EV_REP) && !evdev->ev_rep_driver)
+		callout_drain(&evdev->ev_rep_callout);
 
 	/* destroy_dev can sleep so release lock */
 	ret = evdev_cdev_destroy(evdev);
@@ -533,13 +534,21 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		if (get_bit(evdev->ev_key_states, code) ==
 		    (value != KEY_EVENT_UP)) {
 			/* Detect key repeats. */
-			if (get_bit(evdev->ev_type_flags, EV_REP)
+			if (evdev_event_supported(evdev, EV_REP)
 			    && value != KEY_EVENT_UP)
 				value = KEY_EVENT_REPEAT;
 			else
 				return (0);
-		} else
+		} else {
 			change_bit(evdev->ev_key_states, code, value);
+			if (evdev_event_supported(evdev, EV_REP) &&
+			    !evdev->ev_rep_driver) {
+				if (value != KEY_EVENT_UP)
+					evdev_start_repeat(evdev, code);
+				else
+					evdev_stop_repeat(evdev);
+			}
+		}
 		break;
 
 	case EV_LED:
@@ -809,16 +818,35 @@ evdev_assign_id(struct evdev_dev *dev)
 	dev->ev_id.bustype = BUS_HOST;
 }
 
-#if 0
 static void
-evdev_start_repeat(struct evdev_dev *dev, int32_t key)
+evdev_repeat_callout(void *arg)
 {
-	
+	struct evdev_dev *evdev = (struct evdev_dev *)arg;
+
+	evdev_push_event(evdev, EV_KEY, evdev->ev_rep_key, KEY_EVENT_REPEAT);
+	evdev_sync(evdev);
+
+	if (evdev->ev_rep[REP_PERIOD])
+		callout_reset(&evdev->ev_rep_callout,
+		    evdev->ev_rep[REP_PERIOD] * hz / 1000,
+		    evdev_repeat_callout, evdev);
 }
 
 static void
-evdev_stop_repeat(struct evdev_dev *dev)
+evdev_start_repeat(struct evdev_dev *evdev, uint16_t key)
 {
 
+	if (evdev->ev_rep[REP_DELAY]) {
+		evdev->ev_rep_key = key;
+		callout_reset(&evdev->ev_rep_callout,
+		    evdev->ev_rep[REP_DELAY] * hz / 1000,
+		    evdev_repeat_callout, evdev);
+	}
 }
-#endif
+
+static void
+evdev_stop_repeat(struct evdev_dev *evdev)
+{
+
+	callout_drain(&evdev->ev_rep_callout);
+}
