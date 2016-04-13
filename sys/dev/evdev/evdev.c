@@ -197,7 +197,7 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	
 	if (evdev_event_supported(evdev, EV_REP) && !evdev->ev_rep_driver) {
 		/* Initialize callout */
-		callout_init(&evdev->ev_rep_callout, 1);
+		callout_init_mtx(&evdev->ev_rep_callout, &evdev->ev_mtx, 0);
 
 		if (evdev->ev_rep[REP_DELAY] == 0 &&
 		    evdev->ev_rep[REP_PERIOD] == 0) {
@@ -247,9 +247,6 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
 	EVDEV_UNLOCK(evdev);
-
-	if (evdev_event_supported(evdev, EV_REP) && !evdev->ev_rep_driver)
-		callout_drain(&evdev->ev_rep_callout);
 
 	/* destroy_dev can sleep so release lock */
 	ret = evdev_cdev_destroy(evdev);
@@ -512,18 +509,17 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	return (0);
 }
 
-int
-evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+static int
+evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 	struct evdev_client *client;
 	int32_t postponed_mt_slot = -1;
 
-	if (evdev_check_event(evdev, type, code, value) != 0)
-		return (EINVAL);
-
 	debugf("%s pushed event %d/%d/%d",
 	    evdev->ev_shortname, type, code, value);
+
+	EVDEV_LOCK_ASSERT(evdev);
 
 	/*
 	 * For certain event types, update device state bits
@@ -617,7 +613,6 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	}
 
 	/* Propagate event through all clients */
-	EVDEV_LOCK(evdev);
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		if (evdev->ev_grabber != NULL && evdev->ev_grabber != client)
 			continue;
@@ -633,9 +628,24 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
-	EVDEV_UNLOCK(evdev);
 
 	return (0);
+}
+
+int
+evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t value)
+{
+	int ret;
+
+	if (evdev_check_event(evdev, type, code, value) != 0)
+		return (EINVAL);
+
+	EVDEV_LOCK(evdev);
+	ret = evdev_propagate_event(evdev, type, code, value);
+	EVDEV_UNLOCK(evdev);
+
+	return (ret);
 }
 
 int
@@ -725,9 +735,14 @@ evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 	EVDEV_LOCK_ASSERT(evdev);
 
 	LIST_REMOVE(client, ec_link);
-	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
-	    evdev->ev_methods->ev_close != NULL)
-		evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
+	if (LIST_EMPTY(&evdev->ev_clients)) {
+		if (evdev->ev_methods != NULL &&
+		    evdev->ev_methods->ev_close != NULL)
+			evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
+		if (evdev_event_supported(evdev, EV_REP) &&
+		   !evdev->ev_rep_driver)
+			evdev_stop_repeat(evdev);
+	}
 	evdev_release_client(evdev, client);
 }
 
@@ -823,18 +838,23 @@ evdev_repeat_callout(void *arg)
 {
 	struct evdev_dev *evdev = (struct evdev_dev *)arg;
 
-	evdev_push_event(evdev, EV_KEY, evdev->ev_rep_key, KEY_EVENT_REPEAT);
-	evdev_sync(evdev);
+	evdev_propagate_event(evdev, EV_KEY, evdev->ev_rep_key,
+	    KEY_EVENT_REPEAT);
+	evdev_propagate_event(evdev, EV_SYN, SYN_REPORT, 1);
 
 	if (evdev->ev_rep[REP_PERIOD])
 		callout_reset(&evdev->ev_rep_callout,
 		    evdev->ev_rep[REP_PERIOD] * hz / 1000,
 		    evdev_repeat_callout, evdev);
+	else
+		evdev->ev_rep_key = KEY_RESERVED;
 }
 
 static void
 evdev_start_repeat(struct evdev_dev *evdev, uint16_t key)
 {
+
+	EVDEV_LOCK_ASSERT(evdev);
 
 	if (evdev->ev_rep[REP_DELAY]) {
 		evdev->ev_rep_key = key;
@@ -848,5 +868,10 @@ static void
 evdev_stop_repeat(struct evdev_dev *evdev)
 {
 
-	callout_drain(&evdev->ev_rep_callout);
+	EVDEV_LOCK_ASSERT(evdev);
+
+	if (evdev->ev_rep_key != KEY_RESERVED) {
+		callout_stop(&evdev->ev_rep_callout);
+		evdev->ev_rep_key = KEY_RESERVED;
+	}
 }
