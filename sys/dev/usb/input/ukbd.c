@@ -1313,8 +1313,7 @@ ukbd_attach(device_t dev)
 	sc->sc_evdev = evdev_alloc();
 	evdev_set_name(sc->sc_evdev, device_get_desc(dev));
 	evdev_set_serial(sc->sc_evdev, "0");
-	evdev_set_softc(sc->sc_evdev, kbd);
-	evdev_set_methods(sc->sc_evdev, &ukbd_evdev_methods);
+	evdev_set_methods(sc->sc_evdev, kbd, &ukbd_evdev_methods);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
 	evdev_support_event(sc->sc_evdev, EV_KEY);
 	if (sc->sc_flags & (UKBD_FLAG_NUMLOCK | UKBD_FLAG_CAPSLOCK |

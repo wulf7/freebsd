@@ -249,8 +249,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	switch (cmd) {
 	case UI_DEV_CREATE:
-		evdev_set_methods(state->ucs_evdev, &uinput_ev_methods);
-		evdev_set_softc(state->ucs_evdev, state);
+		evdev_set_methods(state->ucs_evdev, state, &uinput_ev_methods);
 		evdev_register(NULL, state->ucs_evdev);
 		state->ucs_connected = true;
 		return (0);

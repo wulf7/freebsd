@@ -86,8 +86,7 @@ terasic_mtl_touch_attach(struct terasic_mtl_softc *sc)
 	struct input_absinfo absinfo;
 	sc->mtl_evdev = evdev_alloc();
 	evdev_set_name(sc->mtl_evdev, device_get_desc(sc->mtl_dev));
-	evdev_set_softc(sc->mtl_evdev, sc);
-	evdev_set_methods(sc->mtl_evdev, &terasic_mtl_ev_methods);
+	evdev_set_methods(sc->mtl_evdev, sc, &terasic_mtl_ev_methods);
 	evdev_support_event(sc->mtl_evdev, EV_SYN);
 	evdev_support_event(sc->mtl_evdev, EV_KEY);
 	evdev_support_event(sc->mtl_evdev, EV_ABS);

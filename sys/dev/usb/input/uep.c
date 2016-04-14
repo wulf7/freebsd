@@ -383,8 +383,7 @@ uep_attach(device_t dev)
 	sc->evdev = evdev_alloc();
 	evdev_set_name(sc->evdev, device_get_desc(dev));
 	evdev_set_serial(sc->evdev, "0");
-	evdev_set_softc(sc->evdev, sc);
-	evdev_set_methods(sc->evdev, &uep_evdev_methods);
+	evdev_set_methods(sc->evdev, sc, &uep_evdev_methods);
 	evdev_support_prop(sc->evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->evdev, EV_SYN);
 	evdev_support_event(sc->evdev, EV_ABS);

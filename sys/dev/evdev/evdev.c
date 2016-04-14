@@ -278,16 +278,11 @@ evdev_set_serial(struct evdev_dev *evdev, const char *serial)
 }
 
 inline void
-evdev_set_methods(struct evdev_dev *evdev, struct evdev_methods *methods)
+evdev_set_methods(struct evdev_dev *evdev, void *softc,
+    struct evdev_methods *methods)
 {
 
 	evdev->ev_methods = methods;
-}
-
-inline void
-evdev_set_softc(struct evdev_dev *evdev, void *softc)
-{
-
 	evdev->ev_softc = softc;
 }
 

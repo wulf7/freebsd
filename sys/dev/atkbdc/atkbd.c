@@ -481,8 +481,7 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 			evdev = evdev_alloc();
 			evdev_set_name(evdev, device_get_desc(dev));
 			evdev_set_serial(evdev, "0");
-			evdev_set_methods(evdev, &atkbd_evdev_methods);
-			evdev_set_softc(evdev, kbd);
+			evdev_set_methods(evdev, kbd, &atkbd_evdev_methods);
 			evdev_support_event(evdev, EV_SYN);
 			evdev_support_event(evdev, EV_KEY);
 			evdev_support_event(evdev, EV_LED);

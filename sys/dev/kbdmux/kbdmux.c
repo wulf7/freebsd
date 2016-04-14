@@ -517,8 +517,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		snprintf(phys_loc, NAMELEN, KEYBOARD_NAME"%d", unit);
 		evdev_set_phys(evdev, phys_loc);
 		evdev_set_serial(evdev, "0");
-		evdev_set_methods(evdev, &kbdmux_evdev_methods);
-		evdev_set_softc(evdev, kbd);
+		evdev_set_methods(evdev, kbd, &kbdmux_evdev_methods);
 		evdev_support_event(evdev, EV_SYN);
 		evdev_support_event(evdev, EV_KEY);
 		evdev_support_event(evdev, EV_LED);

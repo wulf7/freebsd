@@ -102,7 +102,6 @@ struct evdev_dev
 	char			ev_shortname[NAMELEN];
 	char			ev_serial[NAMELEN];
 	device_t		ev_dev;
-	void *			ev_softc;
 	struct cdev *		ev_cdev;
 	int			ev_unit;
 	struct mtx		ev_mtx;
@@ -142,7 +141,9 @@ struct evdev_dev
 	/* Counters: */
 	uint64_t		ev_event_count;
 
+	/* Parent driver callbacks: */
 	struct evdev_methods *	ev_methods;
+	void *			ev_softc;
 
 	LIST_ENTRY(evdev_dev) ev_link;
 	LIST_HEAD(, evdev_client) ev_clients;
@@ -186,8 +187,7 @@ void evdev_free(struct evdev_dev *);
 void evdev_set_name(struct evdev_dev *, const char *);
 void evdev_set_phys(struct evdev_dev *, const char *);
 void evdev_set_serial(struct evdev_dev *, const char *);
-void evdev_set_methods(struct evdev_dev *, struct evdev_methods *);
-void evdev_set_softc(struct evdev_dev *, void *);
+void evdev_set_methods(struct evdev_dev *, void *, struct evdev_methods *);
 int evdev_register(device_t, struct evdev_dev *);
 int evdev_unregister(device_t, struct evdev_dev *);
 int evdev_push_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);

@@ -1529,8 +1529,7 @@ psmattach(device_t dev)
 	sc->evdev = evdev_alloc();
 	evdev_set_name(sc->evdev, model_name(sc->hw.model));
 	evdev_set_serial(sc->evdev, "0");
-	evdev_set_softc(sc->evdev, sc);
-	evdev_set_methods(sc->evdev, &psm_ev_methods);
+	evdev_set_methods(sc->evdev, sc, &psm_ev_methods);
 	evdev_support_prop(sc->evdev, INPUT_PROP_POINTER);
 	evdev_support_event(sc->evdev, EV_SYN);
 	evdev_support_event(sc->evdev, EV_REL);
