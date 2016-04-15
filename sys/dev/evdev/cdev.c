@@ -411,11 +411,17 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGABS(0) ... EVIOCGABS(ABS_MAX):
+		if (evdev->ev_absinfo == NULL)
+			return (EINVAL);
+
 		memcpy(data, &evdev->ev_absinfo[cmd - EVIOCGABS(0)],
 		    sizeof(struct input_absinfo));
 		return (0);
 
 	case EVIOCSABS(0) ... EVIOCSABS(ABS_MAX):
+		if (evdev->ev_absinfo == NULL)
+			return (EINVAL);
+
 		EVDEV_LOCK(evdev);
 		memcpy(&evdev->ev_absinfo[cmd - EVIOCSABS(0)], data,
 		    sizeof(struct input_absinfo));

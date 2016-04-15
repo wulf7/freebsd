@@ -119,7 +119,7 @@ struct evdev_dev
 	unsigned long		ev_led_flags[nlongs(LED_CNT)];
 	unsigned long		ev_snd_flags[nlongs(SND_CNT)];
 	unsigned long		ev_sw_flags[nlongs(SW_CNT)];
-	struct input_absinfo	ev_absinfo[ABS_CNT];
+	struct input_absinfo *	ev_absinfo;
 
 	/* Repeat parameters & callout: */
 	int			ev_rep[REP_CNT];

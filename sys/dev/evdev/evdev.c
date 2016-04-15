@@ -100,6 +100,21 @@ evdev_free(struct evdev_dev *evdev)
 	free(evdev, M_EVDEV);
 }
 
+static struct input_absinfo *
+evdev_alloc_absinfo(void)
+{
+
+	return (malloc(sizeof(struct input_absinfo) * ABS_CNT, M_EVDEV,
+	    M_WAITOK | M_ZERO));
+}
+
+static void
+evdev_free_absinfo(struct input_absinfo *absinfo)
+{
+
+	free(absinfo, M_EVDEV);
+}
+
 int
 evdev_set_report_size(struct evdev_dev *evdev, size_t report_size)
 {
@@ -253,6 +268,8 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 	if (ret == 0)
 		mtx_destroy(&evdev->ev_mtx);
 
+	evdev_free_absinfo(evdev->ev_absinfo);
+
 	return (ret);
 }
 
@@ -337,6 +354,9 @@ evdev_support_abs(struct evdev_dev *evdev, uint16_t code)
 	if (code >= ABS_CNT)
 		return (EINVAL);
 
+	if (evdev->ev_absinfo == NULL)
+		evdev->ev_absinfo = evdev_alloc_absinfo();
+
 	set_bit(evdev->ev_abs_flags, code);
 	return (0);
 }
@@ -409,11 +429,12 @@ evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
 	return (get_bit(evdev->ev_type_flags, type));
 }
 
-
 inline void
 evdev_set_absinfo(struct evdev_dev *evdev, uint16_t axis,
     struct input_absinfo *absinfo)
 {
+	if (evdev->ev_absinfo == NULL)
+		evdev->ev_absinfo = evdev_alloc_absinfo();
 
 	memcpy(&evdev->ev_absinfo[axis], absinfo, sizeof(struct input_absinfo));
 }
