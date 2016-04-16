@@ -132,11 +132,11 @@ struct evdev_dev
 	unsigned long		ev_led_states[nlongs(LED_CNT)];
 	unsigned long		ev_snd_states[nlongs(SND_CNT)];
 	unsigned long		ev_sw_states[nlongs(SW_CNT)];
+	bool			ev_report_opened;
 
 	/* Multitouch protocol type B state: */
 	int32_t			last_reported_mt_slot;
 	int32_t			ev_mt_states[MAX_MT_SLOTS][MT_CNT];
-	int			events_since_last_syn;
 
 	/* Counters: */
 	uint64_t		ev_event_count;

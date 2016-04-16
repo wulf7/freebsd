@@ -621,11 +621,11 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 	/* Skip empty reports */
 	if (type == EV_SYN && code == SYN_REPORT) {
-		if (evdev->events_since_last_syn == 0)
+		if (!evdev->ev_report_opened)
 			return (0);
-		evdev->events_since_last_syn = 0;
+		evdev->ev_report_opened = false;
 	} else {
-		evdev->events_since_last_syn++;
+		evdev->ev_report_opened = true;
 	}
 
 	/* Propagate event through all clients */
