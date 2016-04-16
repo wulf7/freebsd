@@ -653,17 +653,19 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			evdev->ev_absinfo[code].value = value;
 		}
 		break;
+
+	case EV_SYN:
+		if (code == SYN_REPORT) {
+			/* Skip empty reports */
+			if (!evdev->ev_report_opened)
+				return (EV_SKIP_EVENT);
+			evdev->ev_report_opened = false;
+			return (EV_REPORT_EVENT);
+		}
+		break;
 	}
 
-	/* Skip empty reports */
-	if (type == EV_SYN && code == SYN_REPORT) {
-		if (!evdev->ev_report_opened)
-			return (EV_SKIP_EVENT);
-		evdev->ev_report_opened = false;
-	} else {
-		evdev->ev_report_opened = true;
-	}
-
+	evdev->ev_report_opened = true;
 	return (EV_REPORT_EVENT);
 }
 
