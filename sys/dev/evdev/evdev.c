@@ -530,7 +530,7 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
 	struct evdev_client *client;
-	int32_t postponed_mt_slot = -1;
+	bool postponed_mt_slot = false;
 
 	debugf("%s pushed event %d/%d/%d",
 	    evdev->ev_shortname, type, code, value);
@@ -606,7 +606,7 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			    CURRENT_MT_SLOT(evdev)) {
 				CURRENT_MT_SLOT(evdev) =
 				    evdev->last_reported_mt_slot;
-				postponed_mt_slot = CURRENT_MT_SLOT(evdev);
+				postponed_mt_slot = true;
 			}
 			break;
 
@@ -635,9 +635,9 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 		EVDEV_CLIENT_LOCKQ(client);
 		/* report postponed ABS_MT_SLOT */
-		if (postponed_mt_slot != -1)
+		if (postponed_mt_slot)
 			evdev_client_push(client,
-			    EV_ABS, ABS_MT_SLOT, postponed_mt_slot);
+			    EV_ABS, ABS_MT_SLOT, CURRENT_MT_SLOT(evdev));
 		evdev_client_push(client, type, code, value);
 
 		if (type == EV_SYN && code == SYN_REPORT)
