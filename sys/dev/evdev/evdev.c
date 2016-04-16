@@ -48,6 +48,13 @@
 #define	debugf(fmt, args...)
 #endif
 
+enum evdev_sparse_result
+{
+	EV_SKIP_EVENT,		/* Event value not changed */
+	EV_REPORT_EVENT,	/* Event value changed */
+	EV_REPORT_MT_SLOT,	/* Event value and MT slot number changed */
+};
+
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
 static inline void set_bit(unsigned long *, int);
@@ -525,15 +532,44 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	return (0);
 }
 
-static int
-evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+static void
+evdev_modify_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t *value)
+{
+
+	EVDEV_LOCK_ASSERT(evdev);
+
+	switch (type) {
+	case EV_KEY:
+		if (!evdev_event_supported(evdev, EV_REP))
+			break;
+
+		if (evdev->ev_rep_driver) {
+			/* Detect driver key repeats. */
+			if (get_bit(evdev->ev_key_states, code) &&
+			    *value == KEY_EVENT_DOWN)
+				*value = KEY_EVENT_REPEAT;
+		} else {
+			/* Start/stop callout for evdev repeats */
+			if (get_bit(evdev->ev_key_states, code) == !*value) {
+				if (*value == KEY_EVENT_DOWN)
+					evdev_start_repeat(evdev, code);
+				else
+					evdev_stop_repeat(evdev);
+			}
+		}
+		break;
+
+	case EV_ABS:
+		/* TBD: implement fuzz */
+		break;
+	}
+}
+
+static enum evdev_sparse_result
+evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
-	struct evdev_client *client;
-	bool postponed_mt_slot = false;
-
-	debugf("%s pushed event %d/%d/%d",
-	    evdev->ev_shortname, type, code, value);
 
 	EVDEV_LOCK_ASSERT(evdev);
 
@@ -543,47 +579,46 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	 */
 	switch (type) {
 	case EV_KEY:
-		if (get_bit(evdev->ev_key_states, code) ==
-		    (value != KEY_EVENT_UP)) {
-			/* Detect key repeats. */
-			if (evdev_event_supported(evdev, EV_REP)
-			    && value != KEY_EVENT_UP)
-				value = KEY_EVENT_REPEAT;
-			else
-				return (0);
-		} else {
+		switch (value) {
+		case KEY_EVENT_UP:
+		case KEY_EVENT_DOWN:
+			if (get_bit(evdev->ev_key_states, code) == value)
+				return (EV_SKIP_EVENT);
 			change_bit(evdev->ev_key_states, code, value);
-			if (evdev_event_supported(evdev, EV_REP) &&
-			    !evdev->ev_rep_driver) {
-				if (value != KEY_EVENT_UP)
-					evdev_start_repeat(evdev, code);
-				else
-					evdev_stop_repeat(evdev);
-			}
+			break;
+
+		case KEY_EVENT_REPEAT:
+			if (get_bit(evdev->ev_key_states, code) == 0 ||
+			    !evdev_event_supported(evdev, EV_REP))
+				return (EV_SKIP_EVENT);
+			break;
+
+		default:
+			 return (EV_SKIP_EVENT);
 		}
 		break;
 
 	case EV_LED:
 		if (get_bit(evdev->ev_led_states, code) == value)
-			return (0);
+			return (EV_SKIP_EVENT);
 		change_bit(evdev->ev_led_states, code, value);
 		break;
 
 	case EV_SND:
 		if (get_bit(evdev->ev_snd_states, code) == value)
-			return (0);
+			return (EV_SKIP_EVENT);
 		change_bit(evdev->ev_snd_states, code, value);
 		break;
 
 	case EV_SW:
 		if (get_bit(evdev->ev_sw_states, code) == value)
-			return (0);
+			return (EV_SKIP_EVENT);
 		change_bit(evdev->ev_sw_states, code, value);
 		break;
 
 	case EV_REP:
 		if (evdev->ev_rep[code] == value)
-			return (0);
+			return (EV_SKIP_EVENT);
 		evdev_set_repeat_params(evdev, code, value);
 		break;
 
@@ -593,27 +628,28 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		case ABS_MT_SLOT:
 			/* Postpone ABS_MT_SLOT till next event */
 			evdev->last_reported_mt_slot = value;
-			return (0);
+			return (EV_SKIP_EVENT);
 
 		case ABS_MT_FIRST ... ABS_MT_LAST:
 			/* Don`t repeat MT protocol type B events */
 			if (evdev->ev_mt_states[evdev->last_reported_mt_slot]
 			    [ABS_MT_INDEX(code)] == value)
-				return (0);
+				return (EV_SKIP_EVENT);
 			evdev->ev_mt_states[evdev->last_reported_mt_slot]
 			    [ABS_MT_INDEX(code)] = value;
 			if (evdev->last_reported_mt_slot !=
 			    CURRENT_MT_SLOT(evdev)) {
 				CURRENT_MT_SLOT(evdev) =
 				    evdev->last_reported_mt_slot;
-				postponed_mt_slot = true;
+				evdev->ev_report_opened = true;
+				return (EV_REPORT_MT_SLOT);
 			}
 			break;
 
 		default:
 			/* XXX: Do we need MT protocol type A handling ??? */
 			if (evdev->ev_absinfo[code].value == value)
-				return (0);
+				return (EV_SKIP_EVENT);
 			evdev->ev_absinfo[code].value = value;
 		}
 		break;
@@ -622,11 +658,25 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	/* Skip empty reports */
 	if (type == EV_SYN && code == SYN_REPORT) {
 		if (!evdev->ev_report_opened)
-			return (0);
+			return (EV_SKIP_EVENT);
 		evdev->ev_report_opened = false;
 	} else {
 		evdev->ev_report_opened = true;
 	}
+
+	return (EV_REPORT_EVENT);
+}
+
+static void
+evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t value)
+{
+	struct evdev_client *client;
+
+	debugf("%s pushed event %d/%d/%d",
+	    evdev->ev_shortname, type, code, value);
+
+	EVDEV_LOCK_ASSERT(evdev);
 
 	/* Propagate event through all clients */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
@@ -634,34 +684,50 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			continue;
 
 		EVDEV_CLIENT_LOCKQ(client);
-		/* report postponed ABS_MT_SLOT */
-		if (postponed_mt_slot)
-			evdev_client_push(client,
-			    EV_ABS, ABS_MT_SLOT, CURRENT_MT_SLOT(evdev));
 		evdev_client_push(client, type, code, value);
-
 		if (type == EV_SYN && code == SYN_REPORT)
 			evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
+}
 
-	return (0);
+static void
+evdev_send_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t value)
+{
+	enum evdev_sparse_result sparse;
+
+	EVDEV_LOCK_ASSERT(evdev);
+
+	sparse =  evdev_sparse_event(evdev, type, code, value);
+	switch (sparse) {
+	case EV_REPORT_MT_SLOT:
+		/* report postponed ABS_MT_SLOT */
+		evdev_propagate_event(evdev, EV_ABS, ABS_MT_SLOT,
+		    CURRENT_MT_SLOT(evdev));
+		/* FALLTHROUGH */
+	case EV_REPORT_EVENT:
+		evdev_propagate_event(evdev, type, code, value);
+		/* FALLTHROUGH */
+	case EV_SKIP_EVENT:
+		break;
+	}
 }
 
 int
 evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
-	int ret;
 
 	if (evdev_check_event(evdev, type, code, value) != 0)
 		return (EINVAL);
 
 	EVDEV_LOCK(evdev);
-	ret = evdev_propagate_event(evdev, type, code, value);
+	evdev_modify_event(evdev, type, code, &value);
+	evdev_send_event(evdev, type, code, value);
 	EVDEV_UNLOCK(evdev);
 
-	return (ret);
+	return (0);
 }
 
 int
@@ -854,9 +920,8 @@ evdev_repeat_callout(void *arg)
 {
 	struct evdev_dev *evdev = (struct evdev_dev *)arg;
 
-	evdev_propagate_event(evdev, EV_KEY, evdev->ev_rep_key,
-	    KEY_EVENT_REPEAT);
-	evdev_propagate_event(evdev, EV_SYN, SYN_REPORT, 1);
+	evdev_send_event(evdev, EV_KEY, evdev->ev_rep_key, KEY_EVENT_REPEAT);
+	evdev_send_event(evdev, EV_SYN, SYN_REPORT, 1);
 
 	if (evdev->ev_rep[REP_PERIOD])
 		callout_reset(&evdev->ev_rep_callout,
