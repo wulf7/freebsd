@@ -622,6 +622,11 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		evdev_set_repeat_params(evdev, code, value);
 		break;
 
+	case EV_REL:
+		if (value == 0)
+			return (EV_SKIP_EVENT);
+		break;
+
 	/* For EV_ABS, save last value in absinfo and ev_mt_states */
 	case EV_ABS:
 		switch (code) {
