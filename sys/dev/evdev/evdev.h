@@ -76,10 +76,12 @@ enum evdev_key_events
 	KEY_EVENT_REPEAT
 };
 
+/* evdev clock IDs in Linux semantic */
 enum evdev_clock_id
 {
-	EV_CLOCK_REALTIME = 0,
-	EV_CLOCK_MONOTONIC
+	EV_CLOCK_REALTIME = 0,	/* UTC clock */
+	EV_CLOCK_MONOTONIC,	/* monotonic, stops on suspend */
+	EV_CLOCK_BOOTTIME	/* monotonic, suspend-awared */
 };
 
 #define	PS2_KEYBOARD_VENDOR		1

@@ -655,10 +655,21 @@ static void
 evdev_client_gettime(struct evdev_client *client, struct timeval *tv)
 {
 
-	if (client->ec_clock_id == EV_CLOCK_MONOTONIC)
+	switch (client->ec_clock_id) {
+	case EV_CLOCK_BOOTTIME:
+		/*
+		 * XXX: FreeBSD does not support true POSIX monotonic clock.
+		 *      So aliase EV_CLOCK_BOOTTIME to EV_CLOCK_MONOTONIC.
+		 */
+	case EV_CLOCK_MONOTONIC:
 		microuptime(tv);
-	else
+		break;
+
+	case EV_CLOCK_REALTIME:
+	default:
 		microtime(tv);
+		break;
+	}
 }
 
 void
