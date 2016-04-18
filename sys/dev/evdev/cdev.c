@@ -506,27 +506,35 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGKEY(0):
-		evdev_client_filter_queue(client, EV_KEY);
 		limit = MIN(len, howmany(KEY_CNT, 8));
+		EVDEV_LOCK(evdev);
+		evdev_client_filter_queue(client, EV_KEY);
 		memcpy(data, evdev->ev_key_states, limit);
+		EVDEV_UNLOCK(evdev);
 		return (0);
 
 	case EVIOCGLED(0):
-		evdev_client_filter_queue(client, EV_LED);
 		limit = MIN(len, howmany(LED_CNT, 8));
+		EVDEV_LOCK(evdev);
+		evdev_client_filter_queue(client, EV_LED);
 		memcpy(data, evdev->ev_led_states, limit);
+		EVDEV_UNLOCK(evdev);
 		return (0);
 
 	case EVIOCGSND(0):
-		evdev_client_filter_queue(client, EV_SND);
 		limit = MIN(len, howmany(SND_CNT, 8));
+		EVDEV_LOCK(evdev);
+		evdev_client_filter_queue(client, EV_SND);
 		memcpy(data, evdev->ev_snd_states, limit);
+		EVDEV_UNLOCK(evdev);
 		return (0);
 
 	case EVIOCGSW(0):
-		evdev_client_filter_queue(client, EV_SW);
 		limit = MIN(len, howmany(SW_CNT, 8));
+		EVDEV_LOCK(evdev);
+		evdev_client_filter_queue(client, EV_SW);
 		memcpy(data, evdev->ev_sw_states, limit);
+		EVDEV_UNLOCK(evdev);
 		return (0);
 
 	case EVIOCGBIT(0, 0) ... EVIOCGBIT(EV_MAX, 0):
