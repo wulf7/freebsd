@@ -227,6 +227,15 @@ int evdev_release_client(struct evdev_dev *, struct evdev_client *);
 void evdev_client_push(struct evdev_client *, uint16_t, uint16_t, int32_t);
 void evdev_notify_event(struct evdev_client *);
 
+/* Multitouch related functions: */
+int32_t evdev_get_mt_value(struct evdev_dev *, int32_t, int16_t);
+void evdev_set_mt_value(struct evdev_dev *, int32_t, int16_t, int32_t);
+int32_t evdev_get_mt_slot_by_tracking_id(struct evdev_dev *, int32_t);
+void evdev_support_nfingers(struct evdev_dev *, int32_t);
+void evdev_support_mt_compat(struct evdev_dev *);
+void evdev_push_nfingers(struct evdev_dev *, int32_t);
+void evdev_push_mt_compat(struct evdev_dev *);
+
 /* Utility functions: */
 uint16_t evdev_hid2key(int);
 void evdev_support_all_known_keys(struct evdev_dev *);

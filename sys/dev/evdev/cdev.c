@@ -505,7 +505,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		nvalues = MIN(len / sizeof(int32_t) - 1, MAX_MT_SLOTS);
 		for (int i = 0; i < nvalues; i++)
 			((int32_t *)data)[i + 1] =
-			    evdev->ev_mt_states[i][ABS_MT_INDEX(code)];
+			    evdev_get_mt_value(evdev, i, code);
 		return (0);
 
 	case EVIOCGKEY(0):

@@ -184,7 +184,8 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 int
 evdev_register(device_t dev, struct evdev_dev *evdev)
 {
-	int ret, i;
+	int32_t slot;
+	int ret;
 
 	device_printf(dev, "registered evdev provider: %s <%s>\n",
 	    evdev->ev_name, evdev->ev_serial);
@@ -213,8 +214,8 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	evdev_assign_id(evdev);
 
 	/* Initialize multitouch protocol type B states */
-	for (i = 0; i < MAX_MT_SLOTS; i++)
-		evdev->ev_mt_states[i][ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
+	for (slot = 0; slot < MAX_MT_SLOTS; slot++)
+		evdev_set_mt_value(evdev, slot, ABS_MT_TRACKING_ID, -1);
 
 	/* Estimate maximum report size */
 	if (evdev->ev_report_size == 0) {
@@ -617,11 +618,11 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 		case ABS_MT_FIRST ... ABS_MT_LAST:
 			/* Don`t repeat MT protocol type B events */
-			if (evdev->ev_mt_states[evdev->last_reported_mt_slot]
-			    [ABS_MT_INDEX(code)] == value)
+			if (evdev_get_mt_value(evdev,
+			    evdev->last_reported_mt_slot, code) == value)
 				return (EV_SKIP_EVENT);
-			evdev->ev_mt_states[evdev->last_reported_mt_slot]
-			    [ABS_MT_INDEX(code)] = value;
+			evdev_set_mt_value(evdev,
+			    evdev->last_reported_mt_slot, code, value);
 			if (evdev->last_reported_mt_slot !=
 			    CURRENT_MT_SLOT(evdev)) {
 				CURRENT_MT_SLOT(evdev) =
