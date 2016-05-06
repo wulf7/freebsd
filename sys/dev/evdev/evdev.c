@@ -33,6 +33,7 @@
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/malloc.h>
+#include <sys/bitstring.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -57,40 +58,39 @@ enum evdev_sparse_result
 
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
-static inline void set_bit(unsigned long *, int);
-static inline void clr_bit(unsigned long *, int);
-static inline void change_bit(unsigned long *, int, int);
-static inline int get_bit(unsigned long *, int);
 static void evdev_assign_id(struct evdev_dev *);
 static void evdev_start_repeat(struct evdev_dev *, uint16_t);
 static void evdev_stop_repeat(struct evdev_dev *);
 static int evdev_check_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 
 static inline void
-set_bit(unsigned long *array, int bit)
-{
-	array[bit / LONG_WIDTH] |= (1LL << (bit % LONG_WIDTH));
-}
-
-static inline void
-clr_bit(unsigned long *array, int bit)
-{
-	array[bit / LONG_WIDTH] &= ~(1LL << (bit % LONG_WIDTH));
-}
-
-static inline void
-change_bit(unsigned long *array, int bit, int value)
+bit_change(bitstr_t *bitstr, int bit, int value)
 {
 	if (value)
-		set_bit(array, bit);
+		bit_set(bitstr, bit);
 	else
-		clr_bit(array, bit);
+		bit_clear(bitstr, bit);
 }
 
+/* Count the number of set bits in bit string at or after bit start. */
 static inline int
-get_bit(unsigned long *array, int bit)
+bit_count_at(const bitstr_t *bitstr, int start, int nbits)
 {
-	return ((array[bit / LONG_WIDTH] & (1LL << (bit % LONG_WIDTH))) > 0);
+	int i, count = 0;
+
+	for (i = start; i < start + nbits; i++)
+		if (bit_test(bitstr, i))
+			count++;
+
+	return (count);
+}
+
+/* Count the number of set bits in bit string. */
+static inline int
+bit_count(const bitstr_t *bitstr, int nbits)
+{
+
+	return (bit_count_at(bitstr, /*start*/0, nbits));
 }
 
 struct evdev_dev *
@@ -137,63 +137,43 @@ static size_t
 evdev_estimate_report_size(struct evdev_dev *evdev)
 {
 	size_t size = 0;
-	int16_t i;
-	unsigned long type_detected;
+	int fs_bit;
 
 	/*
 	 * Keyboards generate one event per report but other devices with
 	 * buttons like mouses can report events simultaneously
 	 */
-	type_detected = 0;
-	for (i = 0; i < KEY_CNT; i++) {
-		if (get_bit(evdev->ev_key_flags, i)) {
-			if (i >= BTN_MISC && i < KEY_OK)
-				size++;
-			else
-				type_detected = 1;
-		}
-	}
-	size += (type_detected != 0);
+	bit_ffs_at(evdev->ev_key_flags, KEY_OK, KEY_CNT - KEY_OK, &fs_bit);
+	if (fs_bit == -1)
+		bit_ffs(evdev->ev_key_flags, BTN_MISC, &fs_bit);
+	size += (fs_bit != -1);
+	size += bit_count_at(evdev->ev_key_flags, BTN_MISC, KEY_OK - BTN_MISC);
 
 	/* All relative axes can be reported simultaneously */
-	for (i = 0; i < REL_CNT; i++)
-		if (get_bit(evdev->ev_rel_flags, i))
-			size++;
+	size += bit_count(evdev->ev_rel_flags, REL_CNT);
 
 	/*
 	 * All absolute axes can be reported simultaneously.
 	 * Multitouch axes can be reported ABS_MT_SLOT times
 	 */
-	for (i = 0; i < ABS_CNT; i++) {
-		if (get_bit(evdev->ev_abs_flags, i)) {
-			if (ABS_IS_MT(i) || i == ABS_MT_SLOT)
-				size += MAX_MT_SLOTS;
-			else
-				size++;
-		}
-	}
+	size += bit_count(evdev->ev_abs_flags, ABS_CNT);
+	size += bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT) *
+	    (MAX_MT_SLOTS - 1);
+	if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
+		size += (MAX_MT_SLOTS - 1);
 
 	/* All misc events can be reported simultaneously */
-	for (i = 0; i < MSC_CNT; i++)
-		if (get_bit(evdev->ev_msc_flags, i))
-			size++;
-
+	size += bit_count(evdev->ev_msc_flags, MSC_CNT);
 
 	/* All leds can be reported simultaneously */
-	for (i = 0; i < LED_CNT; i++)
-		if (get_bit(evdev->ev_led_flags, i))
-			size++;
+	size += bit_count(evdev->ev_led_flags, LED_CNT);
 
 	/* Assume other events are generated once per report */
-	type_detected = 0;
-	for (i = 0; i < nlongs(SND_CNT); i++)
-		type_detected |= evdev->ev_snd_flags[i];
-	size += (type_detected != 0);
+	bit_ffs(evdev->ev_snd_flags, SND_CNT, &fs_bit);
+	size += (fs_bit != -1);
 
-	type_detected = 0;
-	for (i = 0; i < nlongs(SW_CNT); i++)
-		type_detected |= evdev->ev_sw_flags[i];
-	size += (type_detected != 0);
+	bit_ffs(evdev->ev_sw_flags, SW_CNT, &fs_bit);
+	size += (fs_bit != -1);
 
 	/* XXX: FF part is not implemented yet */
 
@@ -317,7 +297,7 @@ evdev_support_prop(struct evdev_dev *evdev, uint16_t prop)
 	if (prop >= INPUT_PROP_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_prop_flags, prop);
+	bit_set(evdev->ev_prop_flags, prop);
 	return (0);
 }
 
@@ -328,7 +308,7 @@ evdev_support_event(struct evdev_dev *evdev, uint16_t type)
 	if (type >= EV_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_type_flags, type);
+	bit_set(evdev->ev_type_flags, type);
 	return (0);
 }
 
@@ -339,7 +319,7 @@ evdev_support_key(struct evdev_dev *evdev, uint16_t code)
 	if (code >= KEY_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_key_flags, code);
+	bit_set(evdev->ev_key_flags, code);
 	return (0);
 }
 
@@ -350,7 +330,7 @@ evdev_support_rel(struct evdev_dev *evdev, uint16_t code)
 	if (code >= REL_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_rel_flags, code);
+	bit_set(evdev->ev_rel_flags, code);
 	return (0);
 }
 
@@ -364,7 +344,7 @@ evdev_support_abs(struct evdev_dev *evdev, uint16_t code)
 	if (evdev->ev_absinfo == NULL)
 		evdev->ev_absinfo = evdev_alloc_absinfo();
 
-	set_bit(evdev->ev_abs_flags, code);
+	bit_set(evdev->ev_abs_flags, code);
 	return (0);
 }
 
@@ -376,7 +356,7 @@ evdev_support_msc(struct evdev_dev *evdev, uint16_t code)
 	if (code >= MSC_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_msc_flags, code);
+	bit_set(evdev->ev_msc_flags, code);
 	return (0);
 }
 
@@ -388,7 +368,7 @@ evdev_support_led(struct evdev_dev *evdev, uint16_t code)
 	if (code >= LED_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_led_flags, code);
+	bit_set(evdev->ev_led_flags, code);
 	return (0);
 }
 
@@ -399,7 +379,7 @@ evdev_support_snd(struct evdev_dev *evdev, uint16_t code)
 	if (code >= SND_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_snd_flags, code);
+	bit_set(evdev->ev_snd_flags, code);
 	return (0);
 }
 
@@ -409,7 +389,7 @@ evdev_support_sw(struct evdev_dev *evdev, uint16_t code)
 	if (code >= SW_CNT)
 		return (EINVAL);
 
-	set_bit(evdev->ev_sw_flags, code);
+	bit_set(evdev->ev_sw_flags, code);
 	return (0);
 }
 
@@ -433,7 +413,7 @@ evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
 	if (type >= EV_CNT)
 		return (false);
 
-	return (get_bit(evdev->ev_type_flags, type));
+	return (bit_test(evdev->ev_type_flags, type));
 }
 
 inline void
@@ -472,21 +452,21 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	case EV_KEY:
 		if (code >= KEY_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_key_flags, code))
+		if (!bit_test(evdev->ev_key_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_REL:
 		if (code >= REL_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_rel_flags, code))
+		if (!bit_test(evdev->ev_rel_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_ABS:
 		if (code >= ABS_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_abs_flags, code))
+		if (!bit_test(evdev->ev_abs_flags, code))
 			return (EINVAL);
 		if (code == ABS_MT_SLOT && value >= MAX_MT_SLOTS)
 			return (EINVAL);
@@ -495,28 +475,28 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	case EV_MSC:
 		if (code >= MSC_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_msc_flags, code))
+		if (!bit_test(evdev->ev_msc_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_LED:
 		if (code >= LED_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_led_flags, code))
+		if (!bit_test(evdev->ev_led_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_SND:
 		if (code >= SND_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_snd_flags, code))
+		if (!bit_test(evdev->ev_snd_flags, code))
 			return (EINVAL);
 		break;
 
 	case EV_SW:
 		if (code >= SW_CNT)
 			return (EINVAL);
-		if (!get_bit(evdev->ev_sw_flags, code))
+		if (!bit_test(evdev->ev_sw_flags, code))
 			return (EINVAL);
 		break;
 
@@ -546,12 +526,12 @@ evdev_modify_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 		if (evdev->ev_rep_driver) {
 			/* Detect driver key repeats. */
-			if (get_bit(evdev->ev_key_states, code) &&
+			if (bit_test(evdev->ev_key_states, code) &&
 			    *value == KEY_EVENT_DOWN)
 				*value = KEY_EVENT_REPEAT;
 		} else {
 			/* Start/stop callout for evdev repeats */
-			if (get_bit(evdev->ev_key_states, code) == !*value) {
+			if (bit_test(evdev->ev_key_states, code) == !*value) {
 				if (*value == KEY_EVENT_DOWN)
 					evdev_start_repeat(evdev, code);
 				else
@@ -582,13 +562,13 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		switch (value) {
 		case KEY_EVENT_UP:
 		case KEY_EVENT_DOWN:
-			if (get_bit(evdev->ev_key_states, code) == value)
+			if (bit_test(evdev->ev_key_states, code) == value)
 				return (EV_SKIP_EVENT);
-			change_bit(evdev->ev_key_states, code, value);
+			bit_change(evdev->ev_key_states, code, value);
 			break;
 
 		case KEY_EVENT_REPEAT:
-			if (get_bit(evdev->ev_key_states, code) == 0 ||
+			if (bit_test(evdev->ev_key_states, code) == 0 ||
 			    !evdev_event_supported(evdev, EV_REP))
 				return (EV_SKIP_EVENT);
 			break;
@@ -599,21 +579,21 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		break;
 
 	case EV_LED:
-		if (get_bit(evdev->ev_led_states, code) == value)
+		if (bit_test(evdev->ev_led_states, code) == value)
 			return (EV_SKIP_EVENT);
-		change_bit(evdev->ev_led_states, code, value);
+		bit_change(evdev->ev_led_states, code, value);
 		break;
 
 	case EV_SND:
-		if (get_bit(evdev->ev_snd_states, code) == value)
+		if (bit_test(evdev->ev_snd_states, code) == value)
 			return (EV_SKIP_EVENT);
-		change_bit(evdev->ev_snd_states, code, value);
+		bit_change(evdev->ev_snd_states, code, value);
 		break;
 
 	case EV_SW:
-		if (get_bit(evdev->ev_sw_states, code) == value)
+		if (bit_test(evdev->ev_sw_states, code) == value)
 			return (EV_SKIP_EVENT);
-		change_bit(evdev->ev_sw_states, code, value);
+		bit_change(evdev->ev_sw_states, code, value);
 		break;
 
 	case EV_REP:

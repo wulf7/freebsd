@@ -29,6 +29,7 @@
 #ifndef	_DEV_EVDEV_EVDEV_H
 #define	_DEV_EVDEV_EVDEV_H
 
+#include <sys/bitstring.h>
 #include <sys/queue.h>
 #include <sys/malloc.h>
 #include <sys/kbio.h>
@@ -37,8 +38,13 @@
 #include <dev/kbd/kbdreg.h>
 
 #define	NAMELEN		80
-#define	LONG_WIDTH	(sizeof(unsigned long) * 8)
-#define	nlongs(x)	(howmany(x, sizeof(unsigned long) * 8))
+
+/*
+ * bitstr_t implementation must be identical to one found in EVIOCG*
+ * libevdev ioctls. Our bitstring(3) API is compatible since r299090.
+ */
+_Static_assert(sizeof(bitstr_t) == sizeof(unsigned long),
+    "bitstr_t size mismatch");
 
 MALLOC_DECLARE(M_EVDEV);
 
@@ -112,15 +118,15 @@ struct evdev_dev
 	size_t			ev_report_size;
 
 	/* Supported features: */
-	unsigned long		ev_prop_flags[nlongs(INPUT_PROP_CNT)];
-	unsigned long		ev_type_flags[nlongs(EV_CNT)];
-	unsigned long		ev_key_flags[nlongs(KEY_CNT)];
-	unsigned long		ev_rel_flags[nlongs(REL_CNT)];
-	unsigned long		ev_abs_flags[nlongs(ABS_CNT)];
-	unsigned long		ev_msc_flags[nlongs(MSC_CNT)];
-	unsigned long		ev_led_flags[nlongs(LED_CNT)];
-	unsigned long		ev_snd_flags[nlongs(SND_CNT)];
-	unsigned long		ev_sw_flags[nlongs(SW_CNT)];
+	bitstr_t		bit_decl(ev_prop_flags, INPUT_PROP_CNT);
+	bitstr_t		bit_decl(ev_type_flags, EV_CNT);
+	bitstr_t		bit_decl(ev_key_flags, KEY_CNT);
+	bitstr_t		bit_decl(ev_rel_flags, REL_CNT);
+	bitstr_t		bit_decl(ev_abs_flags, ABS_CNT);
+	bitstr_t		bit_decl(ev_msc_flags, MSC_CNT);
+	bitstr_t		bit_decl(ev_led_flags, LED_CNT);
+	bitstr_t		bit_decl(ev_snd_flags, SND_CNT);
+	bitstr_t		bit_decl(ev_sw_flags, SW_CNT);
 	struct input_absinfo *	ev_absinfo;
 
 	/* Repeat parameters & callout: */
@@ -130,10 +136,10 @@ struct evdev_dev
 	uint16_t		ev_rep_key;
 
 	/* State: */
-	unsigned long		ev_key_states[nlongs(KEY_CNT)];
-	unsigned long		ev_led_states[nlongs(LED_CNT)];
-	unsigned long		ev_snd_states[nlongs(SND_CNT)];
-	unsigned long		ev_sw_states[nlongs(SW_CNT)];
+	bitstr_t		bit_decl(ev_key_states, KEY_CNT);
+	bitstr_t		bit_decl(ev_led_states, LED_CNT);
+	bitstr_t		bit_decl(ev_snd_states, SND_CNT);
+	bitstr_t		bit_decl(ev_sw_states, SW_CNT);
 	bool			ev_report_opened;
 
 	/* Multitouch protocol type B state: */

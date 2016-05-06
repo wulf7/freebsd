@@ -27,6 +27,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/bitstring.h>
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -490,7 +491,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGPROP(0):
-		limit = MIN(len, howmany(INPUT_PROP_CNT, 8));
+		limit = MIN(len, bitstr_size(INPUT_PROP_CNT));
 		memcpy(data, evdev->ev_prop_flags, limit);
 		return (0);
 
@@ -508,7 +509,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGKEY(0):
-		limit = MIN(len, howmany(KEY_CNT, 8));
+		limit = MIN(len, bitstr_size(KEY_CNT));
 		EVDEV_LOCK(evdev);
 		evdev_client_filter_queue(client, EV_KEY);
 		memcpy(data, evdev->ev_key_states, limit);
@@ -516,7 +517,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGLED(0):
-		limit = MIN(len, howmany(LED_CNT, 8));
+		limit = MIN(len, bitstr_size(LED_CNT));
 		EVDEV_LOCK(evdev);
 		evdev_client_filter_queue(client, EV_LED);
 		memcpy(data, evdev->ev_led_states, limit);
@@ -524,7 +525,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGSND(0):
-		limit = MIN(len, howmany(SND_CNT, 8));
+		limit = MIN(len, bitstr_size(SND_CNT));
 		EVDEV_LOCK(evdev);
 		evdev_client_filter_queue(client, EV_SND);
 		memcpy(data, evdev->ev_snd_states, limit);
@@ -532,7 +533,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGSW(0):
-		limit = MIN(len, howmany(SW_CNT, 8));
+		limit = MIN(len, bitstr_size(SW_CNT));
 		EVDEV_LOCK(evdev);
 		evdev_client_filter_queue(client, EV_SW);
 		memcpy(data, evdev->ev_sw_states, limit);
@@ -604,7 +605,7 @@ evdev_ioctl_eviocgbit(struct evdev_dev *evdev, int type, int len, caddr_t data)
 	 */
 	bzero(data, len);
 
-	limit = nlongs(limit) * sizeof(unsigned long);
+	limit = bitstr_size(limit);
 	len = MIN(limit, len);
 	memcpy(data, bitmap, len);
 	return (0);
