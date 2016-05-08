@@ -425,9 +425,13 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (evdev->ev_absinfo == NULL)
 			return (EINVAL);
 
+		code = cmd - EVIOCSABS(0);
+		/* mt-slot number can not be changed */
+		if (code == ABS_MT_SLOT)
+			return (EINVAL);
+
 		EVDEV_LOCK(evdev);
-		memcpy(&evdev->ev_absinfo[cmd - EVIOCSABS(0)], data,
-		    sizeof(struct input_absinfo));
+		evdev_set_absinfo(evdev, code, (struct input_absinfo *)data);
 		EVDEV_UNLOCK(evdev);
 		return (0);
 
