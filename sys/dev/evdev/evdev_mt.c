@@ -54,9 +54,13 @@ static uint16_t evdev_mtstmap[][2] = {
 	{ ABS_MT_TOUCH_MAJOR, ABS_TOOL_WIDTH },
 };
 
+struct evdev_mt_slot {
+	int32_t ev_mt_states[MT_CNT];
+};
+
 struct evdev_mt {
 	int32_t	ev_mt_last_reported_slot;
-	int32_t	ev_mt_states[MAX_MT_SLOTS][MT_CNT];
+	struct evdev_mt_slot ev_mt_slots[];
 };
 
 void
@@ -66,13 +70,13 @@ evdev_mt_init(struct evdev_dev *evdev)
 
 	slots = MAXIMAL_MT_SLOT(evdev) + 1;
 
-	evdev->ev_mt = malloc(sizeof(struct evdev_mt), M_EVDEV,
-	    M_WAITOK | M_ZERO);
+	evdev->ev_mt = malloc(offsetof(struct evdev_mt, ev_mt_slots) +
+	     sizeof(struct evdev_mt_slot) * slots, M_EVDEV, M_WAITOK | M_ZERO);
 
 	/* Initialize multitouch protocol type B states */
 	for (slot = 0; slot < slots; slot++)
-		evdev->ev_mt->ev_mt_states[slot]
-		   [ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
+		evdev->ev_mt->ev_mt_slots[slot].
+		    ev_mt_states[ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
 }
 
 void
@@ -100,7 +104,8 @@ inline int32_t
 evdev_get_mt_value(struct evdev_dev *evdev, int32_t slot, int16_t code)
 {
 
-	return (evdev->ev_mt->ev_mt_states[slot][ABS_MT_INDEX(code)]);
+	return (evdev->ev_mt->
+	    ev_mt_slots[slot].ev_mt_states[ABS_MT_INDEX(code)]);
 }
 
 inline void
@@ -108,7 +113,8 @@ evdev_set_mt_value(struct evdev_dev *evdev, int32_t slot, int16_t code,
     int32_t value)
 {
 
-	evdev->ev_mt->ev_mt_states[slot][ABS_MT_INDEX(code)] = value;
+	evdev->ev_mt->ev_mt_slots[slot].ev_mt_states[ABS_MT_INDEX(code)] =
+	    value;
 }
 
 int32_t
