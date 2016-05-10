@@ -691,6 +691,11 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
+
+	/* Update counters */
+	evdev->ev_event_count++;
+	if (type == EV_SYN && code == SYN_REPORT)
+		evdev->ev_report_count++;
 }
 
 static void

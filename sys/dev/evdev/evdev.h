@@ -149,6 +149,7 @@ struct evdev_dev
 
 	/* Counters: */
 	uint64_t		ev_event_count;
+	uint64_t		ev_report_count;
 
 	/* Parent driver callbacks: */
 	struct evdev_methods *	ev_methods;

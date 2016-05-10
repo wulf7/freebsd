@@ -55,6 +55,7 @@ static uint16_t evdev_mtstmap[][2] = {
 };
 
 struct evdev_mt_slot {
+	uint64_t ev_report;
 	int32_t ev_mt_states[MT_CNT];
 };
 
@@ -74,9 +75,17 @@ evdev_mt_init(struct evdev_dev *evdev)
 	     sizeof(struct evdev_mt_slot) * slots, M_EVDEV, M_WAITOK | M_ZERO);
 
 	/* Initialize multitouch protocol type B states */
-	for (slot = 0; slot < slots; slot++)
-		evdev->ev_mt->ev_mt_slots[slot].
-		    ev_mt_states[ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
+	for (slot = 0; slot < slots; slot++) {
+		/*
+		 * .ev_report should not be initialized to initial value of
+		 * report counter (0) as it brokes free slot detection in
+		 * evdev_get_mt_slot_by_tracking_id. So initialize it to -1
+		 */
+		evdev->ev_mt->ev_mt_slots[slot] = (struct evdev_mt_slot) {
+			.ev_report = 0xFFFFFFFFFFFFFFFFULL,
+			.ev_mt_states[ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1,
+		};
+	}
 }
 
 void
@@ -113,6 +122,10 @@ evdev_set_mt_value(struct evdev_dev *evdev, int32_t slot, int16_t code,
     int32_t value)
 {
 
+	if (code == ABS_MT_TRACKING_ID && value == -1)
+		evdev->ev_mt->ev_mt_slots[slot].ev_report =
+		    evdev->ev_report_count;
+
 	evdev->ev_mt->ev_mt_slots[slot].ev_mt_states[ABS_MT_INDEX(code)] =
 	    value;
 }
@@ -122,17 +135,19 @@ evdev_get_mt_slot_by_tracking_id(struct evdev_dev *evdev, int32_t tracking_id)
 {
 	int32_t tr_id, slot, free_slot = -1;
 
-	/*
-	 * XXX: Its possible that slot will be reassigned in a place of just
-	 *      released one within the same report. If this behaviour is wrong
-	 *      we should introduce report counter and track report number for
-	 *      each ABS_MT_TRACKING_ID change.
-	 */
 	for (slot = 0; slot <= MAXIMAL_MT_SLOT(evdev); slot++) {
 		tr_id = evdev_get_mt_value(evdev, slot, ABS_MT_TRACKING_ID);
 		if (tr_id == tracking_id)
 			return (slot);
-		if (free_slot == -1 && tr_id == -1)
+		/*
+		 * Its possible that slot will be reassigned in a place of just
+		 * released one within the same report. To avoid this compare
+		 * report counter with slot`s report number updated with each
+		 * ABS_MT_TRACKING_ID change.
+		 */
+		if (free_slot == -1 && tr_id == -1 &&
+		    evdev->ev_mt->ev_mt_slots[slot].ev_report !=
+		    evdev->ev_report_count)
 			free_slot = slot;
 	}
 
