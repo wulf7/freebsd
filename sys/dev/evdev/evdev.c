@@ -156,11 +156,13 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 	 * All absolute axes can be reported simultaneously.
 	 * Multitouch axes can be reported ABS_MT_SLOT times
 	 */
-	size += bit_count(evdev->ev_abs_flags, ABS_CNT);
-	size += bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT) *
-	    (MAX_MT_SLOTS - 1);
-	if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
-		size += (MAX_MT_SLOTS - 1);
+	if (evdev->ev_absinfo != NULL) {
+		size += bit_count(evdev->ev_abs_flags, ABS_CNT);
+		size += bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT)
+		    * MAXIMAL_MT_SLOT(evdev);
+		if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
+			size += MAXIMAL_MT_SLOT(evdev);
+	}
 
 	/* All misc events can be reported simultaneously */
 	size += bit_count(evdev->ev_msc_flags, MSC_CNT);
@@ -184,7 +186,6 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 int
 evdev_register(device_t dev, struct evdev_dev *evdev)
 {
-	int32_t slot;
 	int ret;
 
 	device_printf(dev, "registered evdev provider: %s <%s>\n",
@@ -214,8 +215,9 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	evdev_assign_id(evdev);
 
 	/* Initialize multitouch protocol type B states */
-	for (slot = 0; slot < MAX_MT_SLOTS; slot++)
-		evdev_set_mt_value(evdev, slot, ABS_MT_TRACKING_ID, -1);
+	if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT) &&
+	    evdev->ev_absinfo != NULL && MAXIMAL_MT_SLOT(evdev) > 0)
+		evdev_mt_init(evdev);
 
 	/* Estimate maximum report size */
 	if (evdev->ev_report_size == 0) {
@@ -257,6 +259,7 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 		mtx_destroy(&evdev->ev_mtx);
 
 	evdev_free_absinfo(evdev->ev_absinfo);
+	evdev_mt_free(evdev);
 
 	return (ret);
 }
@@ -417,14 +420,23 @@ evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
 	return (bit_test(evdev->ev_type_flags, type));
 }
 
-inline void
+inline int
 evdev_set_absinfo(struct evdev_dev *evdev, uint16_t axis,
     struct input_absinfo *absinfo)
 {
+
+	if (axis >= ABS_CNT)
+		return (EINVAL);
+
+	if (axis == ABS_MT_SLOT &&
+	    (absinfo->maximum < 1 || absinfo->maximum >= MAX_MT_SLOTS))
+		return (EINVAL);
+
 	if (evdev->ev_absinfo == NULL)
 		evdev->ev_absinfo = evdev_alloc_absinfo();
 
 	memcpy(&evdev->ev_absinfo[axis], absinfo, sizeof(struct input_absinfo));
+	return (0);
 }
 
 inline void
@@ -469,7 +481,10 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			return (EINVAL);
 		if (!bit_test(evdev->ev_abs_flags, code))
 			return (EINVAL);
-		if (code == ABS_MT_SLOT && value >= MAX_MT_SLOTS)
+		if (code == ABS_MT_SLOT &&
+		    (value < 0 || value > MAXIMAL_MT_SLOT(evdev)))
+			return (EINVAL);
+		if (ABS_IS_MT(code) && evdev->ev_mt == NULL)
 			return (EINVAL);
 		break;
 
@@ -551,6 +566,7 @@ static enum evdev_sparse_result
 evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
+	int32_t last_mt_slot;
 
 	EVDEV_LOCK_ASSERT(evdev);
 
@@ -613,20 +629,18 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		switch (code) {
 		case ABS_MT_SLOT:
 			/* Postpone ABS_MT_SLOT till next event */
-			evdev->last_reported_mt_slot = value;
+			evdev_set_last_mt_slot(evdev, value);
 			return (EV_SKIP_EVENT);
 
 		case ABS_MT_FIRST ... ABS_MT_LAST:
 			/* Don`t repeat MT protocol type B events */
-			if (evdev_get_mt_value(evdev,
-			    evdev->last_reported_mt_slot, code) == value)
+			last_mt_slot = evdev_get_last_mt_slot(evdev);
+			if (evdev_get_mt_value(evdev, last_mt_slot, code)
+			     == value)
 				return (EV_SKIP_EVENT);
-			evdev_set_mt_value(evdev,
-			    evdev->last_reported_mt_slot, code, value);
-			if (evdev->last_reported_mt_slot !=
-			    CURRENT_MT_SLOT(evdev)) {
-				CURRENT_MT_SLOT(evdev) =
-				    evdev->last_reported_mt_slot;
+			evdev_set_mt_value(evdev, last_mt_slot, code, value);
+			if (last_mt_slot != CURRENT_MT_SLOT(evdev)) {
+				CURRENT_MT_SLOT(evdev) = last_mt_slot;
 				evdev->ev_report_opened = true;
 				return (EV_REPORT_MT_SLOT);
 			}

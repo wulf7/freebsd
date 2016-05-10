@@ -27,6 +27,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/malloc.h>
 #include <sys/systm.h>
 
 #include <dev/evdev/input.h>
@@ -53,11 +54,53 @@ static uint16_t evdev_mtstmap[][2] = {
 	{ ABS_MT_TOUCH_MAJOR, ABS_TOOL_WIDTH },
 };
 
+struct evdev_mt {
+	int32_t	ev_mt_last_reported_slot;
+	int32_t	ev_mt_states[MAX_MT_SLOTS][MT_CNT];
+};
+
+void
+evdev_mt_init(struct evdev_dev *evdev)
+{
+	int32_t slot, slots;
+
+	slots = MAXIMAL_MT_SLOT(evdev) + 1;
+
+	evdev->ev_mt = malloc(sizeof(struct evdev_mt), M_EVDEV,
+	    M_WAITOK | M_ZERO);
+
+	/* Initialize multitouch protocol type B states */
+	for (slot = 0; slot < slots; slot++)
+		evdev->ev_mt->ev_mt_states[slot]
+		   [ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1;
+}
+
+void
+evdev_mt_free(struct evdev_dev *evdev)
+{
+
+	free(evdev->ev_mt, M_EVDEV);
+}
+
+int32_t
+evdev_get_last_mt_slot(struct evdev_dev *evdev)
+{
+
+	return (evdev->ev_mt->ev_mt_last_reported_slot);
+}
+
+void
+evdev_set_last_mt_slot(struct evdev_dev *evdev, int32_t slot)
+{
+
+	evdev->ev_mt->ev_mt_last_reported_slot = slot;
+}
+
 inline int32_t
 evdev_get_mt_value(struct evdev_dev *evdev, int32_t slot, int16_t code)
 {
 
-	return (evdev->ev_mt_states[slot][ABS_MT_INDEX(code)]);
+	return (evdev->ev_mt->ev_mt_states[slot][ABS_MT_INDEX(code)]);
 }
 
 inline void
@@ -65,7 +108,7 @@ evdev_set_mt_value(struct evdev_dev *evdev, int32_t slot, int16_t code,
     int32_t value)
 {
 
-	evdev->ev_mt_states[slot][ABS_MT_INDEX(code)] = value;
+	evdev->ev_mt->ev_mt_states[slot][ABS_MT_INDEX(code)] = value;
 }
 
 int32_t
@@ -79,7 +122,7 @@ evdev_get_mt_slot_by_tracking_id(struct evdev_dev *evdev, int32_t tracking_id)
 	 *      we should introduce report counter and track report number for
 	 *      each ABS_MT_TRACKING_ID change.
 	 */
-	for (slot = 0; slot < MAX_MT_SLOTS; slot++) {
+	for (slot = 0; slot <= MAXIMAL_MT_SLOT(evdev); slot++) {
 		tr_id = evdev_get_mt_value(evdev, slot, ABS_MT_TRACKING_ID);
 		if (tr_id == tracking_id)
 			return (slot);
@@ -112,8 +155,7 @@ evdev_support_mt_compat(struct evdev_dev *evdev)
 
 	/* Touchscreens should not advertise tap tool capabilities */
 	if (!bit_test(evdev->ev_prop_flags, INPUT_PROP_DIRECT))
-		evdev_support_nfingers(evdev,
-		    evdev->ev_absinfo[ABS_MT_SLOT].maximum + 1);
+		evdev_support_nfingers(evdev, MAXIMAL_MT_SLOT(evdev) + 1);
 
 	/* Echo 0-th MT-slot as ST-slot */
 	for (i = 0; i < nitems(evdev_mtstmap); i++) {
@@ -130,7 +172,7 @@ evdev_count_fingers(struct evdev_dev *evdev)
 {
 	int32_t nfingers = 0, i;
 
-	for (i = 0; i <= evdev->ev_absinfo[ABS_MT_SLOT].maximum; i++)
+	for (i = 0; i <= MAXIMAL_MT_SLOT(evdev); i++)
 		if (evdev_get_mt_value(evdev, i, ABS_MT_TRACKING_ID) != -1)
 			nfingers++;
 

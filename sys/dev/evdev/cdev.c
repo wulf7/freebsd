@@ -500,13 +500,16 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGMTSLOTS(0):
+		if (evdev->ev_mt == NULL)
+			return (EINVAL);
 		if (len < sizeof(uint32_t))
 			return (EINVAL);
 		code = *(uint32_t *)data;
 		if (!ABS_IS_MT(code))
 			return (EINVAL);
 
-		nvalues = MIN(len / sizeof(int32_t) - 1, MAX_MT_SLOTS);
+		nvalues =
+		    MIN(len / sizeof(int32_t) - 1, MAXIMAL_MT_SLOT(evdev) + 1);
 		for (int i = 0; i < nvalues; i++)
 			((int32_t *)data)[i + 1] =
 			    evdev_get_mt_value(evdev, i, code);

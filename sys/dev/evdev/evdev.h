@@ -50,6 +50,7 @@ MALLOC_DECLARE(M_EVDEV);
 
 struct evdev_dev;
 struct evdev_client;
+struct evdev_mt;
 
 typedef int (evdev_open_t)(struct evdev_dev *, void *);
 typedef void (evdev_close_t)(struct evdev_dev *, void *);
@@ -67,6 +68,7 @@ typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 #define	ABS_MT_INDEX(x)	((x) - ABS_MT_FIRST)
 #define	MT_CNT		(ABS_MT_INDEX(ABS_MT_LAST) + 1)
 #define	CURRENT_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].value)
+#define	MAXIMAL_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].maximum)
 
 enum evdev_repeat_mode
 {
@@ -143,8 +145,7 @@ struct evdev_dev
 	bool			ev_report_opened;
 
 	/* Multitouch protocol type B state: */
-	int32_t			last_reported_mt_slot;
-	int32_t			ev_mt_states[MAX_MT_SLOTS][MT_CNT];
+	struct evdev_mt *	ev_mt;
 
 	/* Counters: */
 	uint64_t		ev_event_count;
@@ -215,7 +216,7 @@ int evdev_support_snd(struct evdev_dev *, uint16_t);
 int evdev_support_sw(struct evdev_dev *, uint16_t);
 int evdev_support_repeat(struct evdev_dev *, enum evdev_repeat_mode);
 bool evdev_event_supported(struct evdev_dev *, uint16_t);
-void evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
+int evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
 void evdev_set_repeat_params(struct evdev_dev *, uint16_t, int);
 int evdev_set_report_size(struct evdev_dev *, size_t);
 
@@ -228,6 +229,10 @@ void evdev_client_push(struct evdev_client *, uint16_t, uint16_t, int32_t);
 void evdev_notify_event(struct evdev_client *);
 
 /* Multitouch related functions: */
+void evdev_mt_init(struct evdev_dev *);
+void evdev_mt_free(struct evdev_dev *);
+int32_t evdev_get_last_mt_slot(struct evdev_dev *);
+void evdev_set_last_mt_slot(struct evdev_dev *, int32_t);
 int32_t evdev_get_mt_value(struct evdev_dev *, int32_t, int16_t);
 void evdev_set_mt_value(struct evdev_dev *, int32_t, int16_t, int32_t);
 int32_t evdev_get_mt_slot_by_tracking_id(struct evdev_dev *, int32_t);
