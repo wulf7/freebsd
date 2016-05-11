@@ -196,7 +196,7 @@ uinput_setup_provider(struct evdev_dev *evdev, struct uinput_user_dev *udev)
 	
 	bzero(&absinfo, sizeof(struct input_absinfo));
 	for (i = 0; i < ABS_CNT; i++) {
-		if (!isset(&evdev->ev_abs_flags, i))
+		if (!bit_test(evdev->ev_abs_flags, i))
 			continue;
 
 		absinfo.minimum = udev->absmin[i];
