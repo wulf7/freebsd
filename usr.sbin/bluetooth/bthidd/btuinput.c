@@ -139,7 +139,7 @@ int
 uinput_create_mouse(bthid_session_p const s)
 {
 	size_t			i, len;
-	struct uinput_user_dev	uidev;
+	struct uinput_setup	uisetup;
 	struct sockaddr_l2cap	local;
 	socklen_t		sclen;
 	char			devname[HCI_DEVNAME_SIZE];
@@ -157,6 +157,15 @@ uinput_create_mouse(bthid_session_p const s)
 	} else
 		phys = bt_ntoa(&local.l2cap_bdaddr, NULL);
 
+	/* Set evdev device name and bus/vendor information */
+	memset(&uisetup, 0, sizeof(uisetup));
+	snprintf(uisetup.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Mouse (%s)",
+	    bt_ntoa(&s->bdaddr, NULL));
+	uisetup.id.bustype = BUS_BLUETOOTH;
+	uisetup.id.vendor  = 0x0000; /* Dummy value */
+	uisetup.id.product = 0x0000; /* Dummy value */
+	uisetup.id.version = 0x0000; /* Dummy value */
+
 	/* Advertise events and axes */
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_REL) < 0 ||
@@ -164,24 +173,14 @@ uinput_create_mouse(bthid_session_p const s)
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_X) < 0 ||
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_Y) < 0 ||
 	    ioctl(s->uinput, UI_SET_RELBIT, REL_WHEEL) < 0 ||
-	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0)
+	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0 ||
+	    ioctl(s->uinput, UI_DEV_SETUP, &uisetup) < 0)
 		goto bail_out;
 
 	/* Advertise mouse buttons */
 	for (i = 0; i < nitems(mbuttons); i++)
 		if (ioctl(s->uinput, UI_SET_KEYBIT, mbuttons[i]) < 0)
 			goto bail_out;
-
-	/* Set evdev device name and bus/vendor information */
-	memset(&uidev, 0, sizeof(uidev));
-	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Mouse (%s)",
-		bt_ntoa(&s->bdaddr, NULL));
-	uidev.id.bustype = BUS_BLUETOOTH;
-	uidev.id.vendor  = 0x0000; /* Dummy value */
-	uidev.id.product = 0x0000; /* Dummy value */
-	uidev.id.version = 0x0000; /* Dummy value */
-	if (write(s->uinput, &uidev, sizeof(uidev)) < 0)
-		goto bail_out;
 
 	if (ioctl(s->uinput, UI_DEV_CREATE) >= 0)
 		return (0); /* SUCCESS */
@@ -197,7 +196,7 @@ int
 uinput_create_keyboard(bthid_session_p const s)
 {
 	size_t			i, len;
-	struct uinput_user_dev	uidev;
+	struct uinput_setup	uisetup;
 	struct sockaddr_l2cap	local;
 	socklen_t		sclen;
 	char			devname[HCI_DEVNAME_SIZE];
@@ -215,6 +214,15 @@ uinput_create_keyboard(bthid_session_p const s)
 	} else
 		phys = bt_ntoa(&local.l2cap_bdaddr, NULL);
 
+	/* Set evdev device name and bus/vendor information */
+	memset(&uisetup, 0, sizeof(uisetup));
+	snprintf(uisetup.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Keyboard (%s)",
+	    bt_ntoa(&s->bdaddr, NULL));
+	uisetup.id.bustype = BUS_BLUETOOTH;
+	uisetup.id.vendor  = 0x0000; /* Dummy value */
+	uisetup.id.product = 0x0000; /* Dummy value */
+	uisetup.id.version = 0x0000; /* Dummy value */
+
 	/* Advertise key events */
 	if (ioctl(s->uinput, UI_SET_EVBIT, EV_KEY) < 0 ||
 	    ioctl(s->uinput, UI_SET_EVBIT, EV_LED) < 0 ||
@@ -223,24 +231,14 @@ uinput_create_keyboard(bthid_session_p const s)
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_CAPSL) < 0 ||
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_NUML) < 0 ||
 	    ioctl(s->uinput, UI_SET_LEDBIT, LED_SCROLLL) < 0 ||
-	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0)
+	    ioctl(s->uinput, UI_SET_PHYS, phys) < 0 ||
+	    ioctl(s->uinput, UI_DEV_SETUP, &uisetup) < 0)
 		goto bail_out;
 
 	/* Advertise keycodes */
 	for (i = 0; i < nitems(keycodes); i++)
 		if (ioctl(s->uinput, UI_SET_KEYBIT, keycodes[i]) < 0)
 			goto bail_out;
-
-	/* Set evdev device name and bus/vendor information */
-	memset(&uidev, 0, sizeof(uidev));
-	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "Bluetooth Keyboard (%s)",
-		bt_ntoa(&s->bdaddr, NULL));
-	uidev.id.bustype = BUS_BLUETOOTH;
-	uidev.id.vendor  = 0x0000; /* Dummy value */
-	uidev.id.product = 0x0000; /* Dummy value */
-	uidev.id.version = 0x0000; /* Dummy value */
-	if (write(s->uinput, &uidev, sizeof(uidev)) < 0)
-		goto bail_out;
 
 	if (ioctl(s->uinput, UI_DEV_CREATE) >= 0)
 		return (0); /* SUCCESS */
