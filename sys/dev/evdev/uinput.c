@@ -48,6 +48,13 @@
 #define	debugf(fmt, args...)
 #endif
 
+enum uinput_state
+{
+	UINPUT_NEW = 0,
+	UINPUT_CONFIGURED,
+	UINPUT_RUNNING
+};
+
 static evdev_event_t	uinput_ev_event;
 
 static d_open_t		uinput_open;
@@ -56,9 +63,6 @@ static d_write_t	uinput_write;
 static d_ioctl_t	uinput_ioctl;
 static d_poll_t		uinput_poll;
 static void uinput_dtor(void *);
-
-static int uinput_setup_provider(struct evdev_dev *, struct uinput_user_dev *);
-static int uinput_cdev_create(void);
 
 static struct cdevsw uinput_cdevsw = {
 	.d_version = D_VERSION,
@@ -78,10 +82,14 @@ static struct evdev_methods uinput_ev_methods = {
 
 struct uinput_cdev_state
 {
-	bool			ucs_connected;
+	enum uinput_state	ucs_state;
 	struct evdev_dev *	ucs_evdev;
 	struct mtx		ucs_mtx;
 };
+
+static int uinput_setup_provider(struct uinput_cdev_state *,
+    struct uinput_user_dev *);
+static int uinput_cdev_create(void);
 
 static void
 uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
@@ -108,7 +116,7 @@ uinput_dtor(void *data)
 {
 	struct uinput_cdev_state *state = (struct uinput_cdev_state *)data;
 
-	if (state->ucs_connected)
+	if (state->ucs_state == UINPUT_RUNNING)
 		evdev_unregister(NULL, state->ucs_evdev);
 
 	evdev_free(state->ucs_evdev);
@@ -154,7 +162,7 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (!state->ucs_connected) {
+	if (state->ucs_state != UINPUT_RUNNING) {
 		/* Process written struct uinput_user_dev */
 		if (uio->uio_resid != sizeof(struct uinput_user_dev)) {
 			debugf("write size not multiple of struct uinput_user_dev size");
@@ -162,7 +170,7 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 		}
 
 		uiomove(&userdev, sizeof(struct uinput_user_dev), uio);
-		uinput_setup_provider(state->ucs_evdev, &userdev);
+		uinput_setup_provider(state, &userdev);
 	} else {
 		/* Process written event */
 		if (uio->uio_resid % sizeof(struct input_event) != 0) {
@@ -184,42 +192,44 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 }
 
 static int
-uinput_setup_dev(struct evdev_dev *evdev, struct input_id *id, char *name,
-    uint32_t ff_effects_max)
+uinput_setup_dev(struct uinput_cdev_state *state, struct input_id *id,
+    char *name, uint32_t ff_effects_max)
 {
 
 	if (name[0] == 0)
 		return (EINVAL);
 
-	evdev_set_name(evdev, name);
-	memcpy(&evdev->ev_id, id, sizeof(struct input_id));
+	evdev_set_name(state->ucs_evdev, name);
+	memcpy(&state->ucs_evdev->ev_id, id, sizeof(struct input_id));
+	state->ucs_state = UINPUT_CONFIGURED;
 
 	return (0);
 }
 
 static int
-uinput_setup_provider(struct evdev_dev *evdev, struct uinput_user_dev *udev)
+uinput_setup_provider(struct uinput_cdev_state *state,
+    struct uinput_user_dev *udev)
 {
 	struct input_absinfo absinfo;
 	int i, ret;
 
 	debugf("uinput: setup_provider called, udev=%p", udev);
 
-	ret = uinput_setup_dev(evdev, &udev->id, udev->name,
+	ret = uinput_setup_dev(state, &udev->id, udev->name,
 	    udev->ff_effects_max);
 	if (ret)
 		return (ret);
 
 	bzero(&absinfo, sizeof(struct input_absinfo));
 	for (i = 0; i < ABS_CNT; i++) {
-		if (!bit_test(evdev->ev_abs_flags, i))
+		if (!bit_test(state->ucs_evdev->ev_abs_flags, i))
 			continue;
 
 		absinfo.minimum = udev->absmin[i];
 		absinfo.maximum = udev->absmax[i];
 		absinfo.fuzz = udev->absfuzz[i];
 		absinfo.flat = udev->absflat[i];
-		evdev_set_absinfo(evdev, i, &absinfo);
+		evdev_set_absinfo(state->ucs_evdev, i, &absinfo);
 	}
 
 	return (0);
@@ -257,7 +267,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	switch (IOCBASECMD(cmd)) {
 	case UI_GET_SYSNAME(0):
-		if (!state->ucs_connected)
+		if (state->ucs_state != UINPUT_RUNNING)
 			return (ENOENT);
 		if (len == 0)
 			return (EINVAL);
@@ -267,25 +277,34 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	switch (cmd) {
 	case UI_DEV_CREATE:
+		if (state->ucs_state != UINPUT_CONFIGURED)
+			return (EINVAL);
+
 		evdev_set_methods(state->ucs_evdev, state, &uinput_ev_methods);
 		evdev_register(NULL, state->ucs_evdev);
-		state->ucs_connected = true;
+		state->ucs_state = UINPUT_RUNNING;
 		return (0);
 
 	case UI_DEV_DESTROY:
-		if (!state->ucs_connected)
+		if (state->ucs_state != UINPUT_RUNNING)
 			return (0);
 
 		evdev_unregister(NULL, state->ucs_evdev);
-		state->ucs_connected = false;
+		state->ucs_state = UINPUT_NEW;
 		return (0);
 
 	case UI_DEV_SETUP:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
+
 		us = (struct uinput_setup *)data;
-		return (uinput_setup_dev(state->ucs_evdev, &us->id, us->name,
+		return (uinput_setup_dev(state, &us->id, us->name,
 		    us->ff_effects_max));
 
 	case UI_ABS_SETUP:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
+
 		uabs = (struct uinput_abs_setup *)data;
 		ret = evdev_support_abs(state->ucs_evdev, uabs->code);
 		if (ret)
@@ -295,6 +314,9 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		    &uabs->absinfo));
 
 	case UI_SET_EVBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
+
 		if (*(int *)data == EV_REP)
 			return (evdev_support_repeat(state->ucs_evdev,
 			    EVDEV_REPEAT));
@@ -303,29 +325,43 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			    *(int *)data));
 
 	case UI_SET_KEYBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_key(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_RELBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_rel(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_ABSBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_abs(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_MSCBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_msc(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_LEDBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_led(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_SNDBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_snd(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_FFBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		/* Fake unsupported ioctl */
 		return (0);
 
 	case UI_SET_PHYS:
-		if (state->ucs_connected)
+		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
 		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
 		/* Linux returns EINVAL when string does not fit the buffer */
@@ -337,15 +373,21 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case UI_SET_SWBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_sw(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_PROPBIT:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		return (evdev_support_prop(state->ucs_evdev, *(int *)data));
 
 	case UI_BEGIN_FF_UPLOAD:
 	case UI_END_FF_UPLOAD:
 	case UI_BEGIN_FF_ERASE:
 	case UI_END_FF_ERASE:
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
 		/* Fake unsupported ioctl */
 		return (0);
 
