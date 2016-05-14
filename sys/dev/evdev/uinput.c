@@ -184,16 +184,32 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 }
 
 static int
+uinput_setup_dev(struct evdev_dev *evdev, struct input_id *id, char *name,
+    uint32_t ff_effects_max)
+{
+
+	if (name[0] == 0)
+		return (EINVAL);
+
+	evdev_set_name(evdev, name);
+	memcpy(&evdev->ev_id, id, sizeof(struct input_id));
+
+	return (0);
+}
+
+static int
 uinput_setup_provider(struct evdev_dev *evdev, struct uinput_user_dev *udev)
 {
 	struct input_absinfo absinfo;
-	int i;
+	int i, ret;
 
 	debugf("uinput: setup_provider called, udev=%p", udev);
 
-	evdev_set_name(evdev, udev->name);
-	memcpy(&evdev->ev_id, &udev->id, sizeof(struct input_id));
-	
+	ret = uinput_setup_dev(evdev, &udev->id, udev->name,
+	    udev->ff_effects_max);
+	if (ret)
+		return (ret);
+
 	bzero(&absinfo, sizeof(struct input_absinfo));
 	for (i = 0; i < ABS_CNT; i++) {
 		if (!bit_test(evdev->ev_abs_flags, i))
@@ -226,6 +242,8 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
     struct thread *td)
 {
 	struct uinput_cdev_state *state;
+	struct uinput_setup *us;
+	struct uinput_abs_setup *uabs;
 	int ret, len;
 	char buf[NAMELEN];
 
@@ -261,6 +279,20 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		evdev_unregister(NULL, state->ucs_evdev);
 		state->ucs_connected = false;
 		return (0);
+
+	case UI_DEV_SETUP:
+		us = (struct uinput_setup *)data;
+		return (uinput_setup_dev(state->ucs_evdev, &us->id, us->name,
+		    us->ff_effects_max));
+
+	case UI_ABS_SETUP:
+		uabs = (struct uinput_abs_setup *)data;
+		ret = evdev_support_abs(state->ucs_evdev, uabs->code);
+		if (ret)
+			return (ret);
+
+		return (evdev_set_absinfo(state->ucs_evdev, uabs->code,
+		    &uabs->absinfo));
 
 	case UI_SET_EVBIT:
 		if (*(int *)data == EV_REP)
