@@ -441,7 +441,12 @@ evdev_set_absinfo(struct evdev_dev *evdev, uint16_t axis,
 	if (evdev->ev_absinfo == NULL)
 		evdev->ev_absinfo = evdev_alloc_absinfo();
 
-	memcpy(&evdev->ev_absinfo[axis], absinfo, sizeof(struct input_absinfo));
+	if (axis == ABS_MT_SLOT)
+		evdev->ev_absinfo[ABS_MT_SLOT].maximum = absinfo->maximum;
+	else
+		memcpy(&evdev->ev_absinfo[axis], absinfo,
+		    sizeof(struct input_absinfo));
+
 	return (0);
 }
 
