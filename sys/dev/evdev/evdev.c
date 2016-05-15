@@ -137,7 +137,7 @@ static size_t
 evdev_estimate_report_size(struct evdev_dev *evdev)
 {
 	size_t size = 0;
-	int fs_bit;
+	int fs_bit, mt;
 
 	/*
 	 * Keyboards generate one event per report but other devices with
@@ -158,10 +158,16 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 	 */
 	if (evdev->ev_absinfo != NULL) {
 		size += bit_count(evdev->ev_abs_flags, ABS_CNT);
-		size += bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT)
-		    * MAXIMAL_MT_SLOT(evdev);
-		if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
-			size += MAXIMAL_MT_SLOT(evdev);
+		mt = bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT);
+		if (mt > 0) {
+			mt++;	/* ABS_MT_SLOT or SYN_MT_REPORT */
+			if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
+				/* MT type B */
+				size += mt * MAXIMAL_MT_SLOT(evdev);
+			else
+				/* MT type A */
+				size += mt * (MAX_MT_REPORTS - 1);
+		}
 	}
 
 	/* All misc events can be reported simultaneously */
@@ -484,7 +490,8 @@ evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		if (code == ABS_MT_SLOT &&
 		    (value < 0 || value > MAXIMAL_MT_SLOT(evdev)))
 			return (EINVAL);
-		if (ABS_IS_MT(code) && evdev->ev_mt == NULL)
+		if (ABS_IS_MT(code) && evdev->ev_mt == NULL &&
+		    bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
 			return (EINVAL);
 		break;
 
@@ -633,6 +640,9 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			return (EV_SKIP_EVENT);
 
 		case ABS_MT_FIRST ... ABS_MT_LAST:
+			/* Pass MT protocol type A events as is */
+			if (!bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
+				break;
 			/* Don`t repeat MT protocol type B events */
 			last_mt_slot = evdev_get_last_mt_slot(evdev);
 			if (evdev_get_mt_value(evdev, last_mt_slot, code)
@@ -647,7 +657,6 @@ evdev_sparse_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			break;
 
 		default:
-			/* XXX: Do we need MT protocol type A handling ??? */
 			if (evdev->ev_absinfo[code].value == value)
 				return (EV_SKIP_EVENT);
 			evdev->ev_absinfo[code].value = value;

@@ -60,13 +60,15 @@ typedef void (evdev_keycode_t)(struct evdev_dev *, void *,
     struct input_keymap_entry *);
 typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 
-/* Multitouch protocol type B interface */
-#define	MAX_MT_SLOTS	16
 #define	ABS_MT_FIRST	ABS_MT_TOUCH_MAJOR
 #define	ABS_MT_LAST	ABS_MT_TOOL_Y
 #define	ABS_IS_MT(x)	((x) >= ABS_MT_FIRST && (x) <= ABS_MT_LAST)
 #define	ABS_MT_INDEX(x)	((x) - ABS_MT_FIRST)
 #define	MT_CNT		(ABS_MT_INDEX(ABS_MT_LAST) + 1)
+/* Multitouch protocol type A */
+#define	MAX_MT_REPORTS	5
+/* Multitouch protocol type B interface */
+#define	MAX_MT_SLOTS	16
 #define	CURRENT_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].value)
 #define	MAXIMAL_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].maximum)
 
