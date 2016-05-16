@@ -340,6 +340,7 @@ wmt_attach(device_t dev)
 	evdev_support_prop(sc->evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->evdev, EV_SYN);
 	evdev_support_event(sc->evdev, EV_ABS);
+	evdev_set_flag(sc->evdev, EVDEV_FLAG_MT_STCOMPAT);
 
 	/* Report absolute contacts and axes information */
 	for (i = 0; i < WMT_N_USAGES; i++) {
@@ -349,7 +350,6 @@ wmt_attach(device_t dev)
 			    (struct input_absinfo *)&sc->ai[i]);
 		}
 	}
-	evdev_support_mt_compat(sc->evdev);
 
 	err = evdev_register(dev, sc->evdev);
 	if (err)
@@ -441,7 +441,6 @@ wmt_process_frame(struct wmt_softc *sc, uint8_t *buf, int len)
 					    wmt_hid_map[i].code, slot_data[i]);
 		}
 	}
-	evdev_push_mt_compat(sc->evdev);
 	evdev_sync(sc->evdev);
 }
 
