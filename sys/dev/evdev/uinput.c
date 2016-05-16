@@ -281,6 +281,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			return (EINVAL);
 
 		evdev_set_methods(state->ucs_evdev, state, &uinput_ev_methods);
+		evdev_set_flag(state->ucs_evdev, EVDEV_FLAG_SOFTREPEAT);
 		evdev_register(NULL, state->ucs_evdev);
 		state->ucs_state = UINPUT_RUNNING;
 		return (0);
@@ -317,12 +318,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
 
-		if (*(int *)data == EV_REP)
-			return (evdev_support_repeat(state->ucs_evdev,
-			    EVDEV_REPEAT));
-		else
-			return (evdev_support_event(state->ucs_evdev,
-			    *(int *)data));
+		return (evdev_support_event(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_KEYBIT:
 		if (state->ucs_state == UINPUT_RUNNING)

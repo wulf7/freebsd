@@ -205,7 +205,8 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 	if (dev != NULL)
 		strlcpy(evdev->ev_shortname, device_get_nameunit(dev), NAMELEN);
 	
-	if (evdev_event_supported(evdev, EV_REP) && !evdev->ev_rep_driver) {
+	if (evdev_event_supported(evdev, EV_REP) &&
+	    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
 		/* Initialize callout */
 		callout_init_mtx(&evdev->ev_rep_callout, &evdev->ev_mtx, 0);
 
@@ -403,19 +404,6 @@ evdev_support_sw(struct evdev_dev *evdev, uint16_t code)
 	return (0);
 }
 
-inline int
-evdev_support_repeat(struct evdev_dev *evdev, enum evdev_repeat_mode mode)
-{
-
-	if (mode != NO_REPEAT)
-		evdev_support_event(evdev, EV_REP);
-
-	if (mode == DRIVER_REPEAT)
-		evdev->ev_rep_driver = true;
-
-	return (0);
-}
-
 bool
 evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
 {
@@ -456,6 +444,17 @@ evdev_set_repeat_params(struct evdev_dev *evdev, uint16_t property, int value)
 
 	KASSERT(property < REP_CNT, ("invalid evdev repeat property"));
 	evdev->ev_rep[property] = value;
+}
+
+inline int
+evdev_set_flag(struct evdev_dev *evdev, uint16_t flag)
+{
+
+	if (flag >= EVDEV_FLAG_CNT)
+		return (EINVAL);
+
+	bit_set(evdev->ev_flags, flag);
+	return(0);
 }
 
 static int
@@ -552,7 +551,7 @@ evdev_modify_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		if (!evdev_event_supported(evdev, EV_REP))
 			break;
 
-		if (evdev->ev_rep_driver) {
+		if (!bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
 			/* Detect driver key repeats. */
 			if (bit_test(evdev->ev_key_states, code) &&
 			    *value == KEY_EVENT_DOWN)
@@ -760,7 +759,7 @@ evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	switch (type) {
 	case EV_REP:
 		/* evdev repeats should not be processed by hardware driver */
-		if (!evdev->ev_rep_driver)
+		if (bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT))
 			goto push;
 		/* FALLTHROUGH */
 	case EV_LED:
@@ -843,7 +842,7 @@ evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 		    evdev->ev_methods->ev_close != NULL)
 			evdev->ev_methods->ev_close(evdev, evdev->ev_softc);
 		if (evdev_event_supported(evdev, EV_REP) &&
-		   !evdev->ev_rep_driver)
+		    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT))
 			evdev_stop_repeat(evdev);
 	}
 	evdev_release_client(evdev, client);

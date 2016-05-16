@@ -1319,7 +1319,7 @@ ukbd_attach(device_t dev)
 	if (sc->sc_flags & (UKBD_FLAG_NUMLOCK | UKBD_FLAG_CAPSLOCK |
 			    UKBD_FLAG_SCROLLLOCK))
 		evdev_support_event(sc->sc_evdev, EV_LED);
-	evdev_support_repeat(sc->sc_evdev, DRIVER_REPEAT);
+	evdev_support_event(sc->sc_evdev, EV_REP);
 
 	for (i = 0x00; i <= 0xFF; i++)
 		evdev_support_key(sc->sc_evdev, evdev_hid2key(i));

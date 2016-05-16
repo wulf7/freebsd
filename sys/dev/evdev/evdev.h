@@ -72,12 +72,9 @@ typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 #define	CURRENT_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].value)
 #define	MAXIMAL_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].maximum)
 
-enum evdev_repeat_mode
-{
-	NO_REPEAT,
-	DRIVER_REPEAT,
-	EVDEV_REPEAT
-};
+#define	EVDEV_FLAG_SOFTREPEAT	0x00	/* use evdev to repeat keys */
+#define	EVDEV_FLAG_MAX		0x1F
+#define	EVDEV_FLAG_CNT		(EVDEV_FLAG_MAX + 1)
 
 enum evdev_key_events
 {
@@ -108,6 +105,7 @@ struct evdev_methods
 	evdev_keycode_t		*ev_set_keycode;
 };
 
+
 struct evdev_dev
 {
 	char			ev_name[NAMELEN];
@@ -132,11 +130,11 @@ struct evdev_dev
 	bitstr_t		bit_decl(ev_snd_flags, SND_CNT);
 	bitstr_t		bit_decl(ev_sw_flags, SW_CNT);
 	struct input_absinfo *	ev_absinfo;
+	bitstr_t		bit_decl(ev_flags, EVDEV_FLAG_CNT);
 
 	/* Repeat parameters & callout: */
 	int			ev_rep[REP_CNT];
 	struct callout		ev_rep_callout;
-	bool			ev_rep_driver;
 	uint16_t		ev_rep_key;
 
 	/* State: */
@@ -217,11 +215,11 @@ int evdev_support_msc(struct evdev_dev *, uint16_t);
 int evdev_support_led(struct evdev_dev *, uint16_t);
 int evdev_support_snd(struct evdev_dev *, uint16_t);
 int evdev_support_sw(struct evdev_dev *, uint16_t);
-int evdev_support_repeat(struct evdev_dev *, enum evdev_repeat_mode);
 bool evdev_event_supported(struct evdev_dev *, uint16_t);
 int evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
 void evdev_set_repeat_params(struct evdev_dev *, uint16_t, int);
 int evdev_set_report_size(struct evdev_dev *, size_t);
+int evdev_set_flag(struct evdev_dev *, uint16_t);
 
 /* Client interface: */
 int evdev_register_client(struct evdev_dev *, struct evdev_client *);
