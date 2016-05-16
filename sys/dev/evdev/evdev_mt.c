@@ -28,6 +28,8 @@
 
 #include <sys/param.h>
 #include <sys/malloc.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/systm.h>
 
 #include <dev/evdev/input.h>
@@ -86,6 +88,9 @@ evdev_mt_init(struct evdev_dev *evdev)
 			.ev_mt_states[ABS_MT_INDEX(ABS_MT_TRACKING_ID)] = -1,
 		};
 	}
+
+	if (bit_test(evdev->ev_flags, EVDEV_FLAG_MT_STCOMPAT))
+		evdev_support_mt_compat(evdev);
 }
 
 void
@@ -200,40 +205,62 @@ evdev_count_fingers(struct evdev_dev *evdev)
 	return (nfingers);
 }
 
-void
-evdev_push_nfingers(struct evdev_dev *evdev, int32_t nfingers)
+static void
+evdev_send_nfingers(struct evdev_dev *evdev, int32_t nfingers)
 {
 	int32_t i;
+
+	EVDEV_LOCK_ASSERT(evdev);
 
 	if (nfingers > nitems(evdev_fngmap))
 		nfingers = nitems(evdev_fngmap);
 
 	for (i = 0; i < nitems(evdev_fngmap); i++)
-		evdev_push_event(evdev, EV_KEY, evdev_fngmap[i],
+		evdev_send_event(evdev, EV_KEY, evdev_fngmap[i],
 		    nfingers == i + 1);
 }
 
 void
-evdev_push_mt_compat(struct evdev_dev *evdev)
+evdev_push_nfingers(struct evdev_dev *evdev, int32_t nfingers)
+{
+
+	EVDEV_LOCK(evdev);
+	evdev_send_nfingers(evdev, nfingers);
+	EVDEV_UNLOCK(evdev);
+}
+
+void
+evdev_send_mt_compat(struct evdev_dev *evdev)
 {
 	int32_t nfingers, i;
 
+	EVDEV_LOCK_ASSERT(evdev);
+
 	nfingers = evdev_count_fingers(evdev);
-	evdev_push_event(evdev, EV_KEY, BTN_TOUCH, nfingers > 0);
+	evdev_send_event(evdev, EV_KEY, BTN_TOUCH, nfingers > 0);
 
 	if (evdev_get_mt_value(evdev, 0, ABS_MT_TRACKING_ID) != -1)
 		/* Echo 0-th MT-slot as ST-slot */
 		for (i = 0; i < nitems(evdev_mtstmap); i++)
 			if (bit_test(evdev->ev_abs_flags, evdev_mtstmap[i][1]))
-				evdev_push_event(evdev, EV_ABS,
+				evdev_send_event(evdev, EV_ABS,
 				    evdev_mtstmap[i][1],
 				    evdev_get_mt_value(evdev, 0,
 				    evdev_mtstmap[i][0]));
 
 	/* Touchscreens should not report tool taps */
 	if (!bit_test(evdev->ev_prop_flags, INPUT_PROP_DIRECT))
-		evdev_push_nfingers(evdev, nfingers);
+		evdev_send_nfingers(evdev, nfingers);
 
 	if (nfingers == 0)
-		evdev_push_event(evdev, EV_ABS, ABS_PRESSURE, 0);
+		evdev_send_event(evdev, EV_ABS, ABS_PRESSURE, 0);
+}
+
+void
+evdev_push_mt_compat(struct evdev_dev *evdev)
+{
+
+	EVDEV_LOCK(evdev);
+	evdev_send_mt_compat(evdev);
+	EVDEV_UNLOCK(evdev);
 }

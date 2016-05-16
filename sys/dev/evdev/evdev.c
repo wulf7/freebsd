@@ -711,7 +711,7 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 		evdev->ev_report_count++;
 }
 
-static void
+void
 evdev_send_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
@@ -744,6 +744,9 @@ evdev_push_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 
 	EVDEV_LOCK(evdev);
 	evdev_modify_event(evdev, type, code, &value);
+	if (type == EV_SYN && code == SYN_REPORT && evdev->ev_report_opened &&
+	    bit_test(evdev->ev_flags, EVDEV_FLAG_MT_STCOMPAT))
+		evdev_send_mt_compat(evdev);
 	evdev_send_event(evdev, type, code, value);
 	EVDEV_UNLOCK(evdev);
 

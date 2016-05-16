@@ -73,6 +73,8 @@ typedef void (evdev_client_event_t)(struct evdev_client *, void *);
 #define	MAXIMAL_MT_SLOT(evdev)	((evdev)->ev_absinfo[ABS_MT_SLOT].maximum)
 
 #define	EVDEV_FLAG_SOFTREPEAT	0x00	/* use evdev to repeat keys */
+#define	EVDEV_FLAG_MT_STCOMPAT	0x01	/* autogenerate ST-compatible events
+					 * for MT protocol type B reports */
 #define	EVDEV_FLAG_MAX		0x1F
 #define	EVDEV_FLAG_CNT		(EVDEV_FLAG_MAX + 1)
 
@@ -104,7 +106,6 @@ struct evdev_methods
 	evdev_keycode_t		*ev_get_keycode;
 	evdev_keycode_t		*ev_set_keycode;
 };
-
 
 struct evdev_dev
 {
@@ -201,6 +202,7 @@ void evdev_set_methods(struct evdev_dev *, void *, struct evdev_methods *);
 int evdev_register(device_t, struct evdev_dev *);
 int evdev_unregister(device_t, struct evdev_dev *);
 int evdev_push_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
+void evdev_send_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 int evdev_inject_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 int evdev_sync(struct evdev_dev *);
 int evdev_mt_sync(struct evdev_dev *);
@@ -240,6 +242,7 @@ int32_t evdev_get_mt_slot_by_tracking_id(struct evdev_dev *, int32_t);
 void evdev_support_nfingers(struct evdev_dev *, int32_t);
 void evdev_support_mt_compat(struct evdev_dev *);
 void evdev_push_nfingers(struct evdev_dev *, int32_t);
+void evdev_send_mt_compat(struct evdev_dev *);
 void evdev_push_mt_compat(struct evdev_dev *);
 
 /* Utility functions: */
