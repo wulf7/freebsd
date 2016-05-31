@@ -72,27 +72,6 @@ bit_change(bitstr_t *bitstr, int bit, int value)
 		bit_clear(bitstr, bit);
 }
 
-/* Count the number of set bits in bit string at or after bit start. */
-static inline int
-bit_count_at(const bitstr_t *bitstr, int start, int nbits)
-{
-	int i, count = 0;
-
-	for (i = start; i < start + nbits; i++)
-		if (bit_test(bitstr, i))
-			count++;
-
-	return (count);
-}
-
-/* Count the number of set bits in bit string. */
-static inline int
-bit_count(const bitstr_t *bitstr, int nbits)
-{
-
-	return (bit_count_at(bitstr, /*start*/0, nbits));
-}
-
 struct evdev_dev *
 evdev_alloc(void)
 {
@@ -137,51 +116,56 @@ static size_t
 evdev_estimate_report_size(struct evdev_dev *evdev)
 {
 	size_t size = 0;
-	int fs_bit, mt;
+	int res;
 
 	/*
 	 * Keyboards generate one event per report but other devices with
 	 * buttons like mouses can report events simultaneously
 	 */
-	bit_ffs_at(evdev->ev_key_flags, KEY_OK, KEY_CNT - KEY_OK, &fs_bit);
-	if (fs_bit == -1)
-		bit_ffs(evdev->ev_key_flags, BTN_MISC, &fs_bit);
-	size += (fs_bit != -1);
-	size += bit_count_at(evdev->ev_key_flags, BTN_MISC, KEY_OK - BTN_MISC);
+	bit_ffs_at(evdev->ev_key_flags, KEY_OK, KEY_CNT - KEY_OK, &res);
+	if (res == -1)
+		bit_ffs(evdev->ev_key_flags, BTN_MISC, &res);
+	size += (res != -1);
+	bit_count(evdev->ev_key_flags, BTN_MISC, KEY_OK - BTN_MISC, &res);
+	size += res;
 
 	/* All relative axes can be reported simultaneously */
-	size += bit_count(evdev->ev_rel_flags, REL_CNT);
+	bit_count(evdev->ev_rel_flags, 0, REL_CNT, &res);
+	size += res;
 
 	/*
 	 * All absolute axes can be reported simultaneously.
 	 * Multitouch axes can be reported ABS_MT_SLOT times
 	 */
 	if (evdev->ev_absinfo != NULL) {
-		size += bit_count(evdev->ev_abs_flags, ABS_CNT);
-		mt = bit_count_at(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT);
-		if (mt > 0) {
-			mt++;	/* ABS_MT_SLOT or SYN_MT_REPORT */
+		bit_count(evdev->ev_abs_flags, 0, ABS_CNT, &res);
+		size += res;
+		bit_count(evdev->ev_abs_flags, ABS_MT_FIRST, MT_CNT, &res);
+		if (res > 0) {
+			res++;	/* ABS_MT_SLOT or SYN_MT_REPORT */
 			if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT))
 				/* MT type B */
-				size += mt * MAXIMAL_MT_SLOT(evdev);
+				size += res * MAXIMAL_MT_SLOT(evdev);
 			else
 				/* MT type A */
-				size += mt * (MAX_MT_REPORTS - 1);
+				size += res * (MAX_MT_REPORTS - 1);
 		}
 	}
 
 	/* All misc events can be reported simultaneously */
-	size += bit_count(evdev->ev_msc_flags, MSC_CNT);
+	bit_count(evdev->ev_msc_flags, 0, MSC_CNT, &res);
+	size += res;
 
 	/* All leds can be reported simultaneously */
-	size += bit_count(evdev->ev_led_flags, LED_CNT);
+	bit_count(evdev->ev_led_flags, 0, LED_CNT, &res);
+	size += res;
 
 	/* Assume other events are generated once per report */
-	bit_ffs(evdev->ev_snd_flags, SND_CNT, &fs_bit);
-	size += (fs_bit != -1);
+	bit_ffs(evdev->ev_snd_flags, SND_CNT, &res);
+	size += (res != -1);
 
-	bit_ffs(evdev->ev_sw_flags, SW_CNT, &fs_bit);
-	size += (fs_bit != -1);
+	bit_ffs(evdev->ev_sw_flags, SW_CNT, &res);
+	size += (res != -1);
 
 	/* XXX: FF part is not implemented yet */
 
