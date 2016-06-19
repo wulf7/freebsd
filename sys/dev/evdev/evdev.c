@@ -330,9 +330,21 @@ evdev_support_rel(struct evdev_dev *evdev, uint16_t code)
 }
 
 inline int
-evdev_support_abs(struct evdev_dev *evdev, uint16_t code)
+evdev_support_abs(struct evdev_dev *evdev, uint16_t code,
+    struct input_absinfo *absinfo)
 {
+	int ret;
 
+	ret = evdev_set_absinfo(evdev, code, absinfo);
+	if (ret)
+		return (ret);
+
+	return (evdev_set_abs_bit(evdev, code));
+}
+
+inline int
+evdev_set_abs_bit(struct evdev_dev *evdev, uint16_t code)
+{
 	if (code >= ABS_CNT)
 		return (EINVAL);
 
@@ -342,7 +354,6 @@ evdev_support_abs(struct evdev_dev *evdev, uint16_t code)
 	bit_set(evdev->ev_abs_flags, code);
 	return (0);
 }
-
 
 inline int
 evdev_support_msc(struct evdev_dev *evdev, uint16_t code)

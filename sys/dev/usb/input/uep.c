@@ -388,16 +388,14 @@ uep_attach(device_t dev)
 	evdev_support_event(sc->evdev, EV_SYN);
 	evdev_support_event(sc->evdev, EV_ABS);
 	evdev_support_event(sc->evdev, EV_KEY);
-	evdev_support_abs(sc->evdev, ABS_X);
-	evdev_support_abs(sc->evdev, ABS_Y);
 
 	absinfo.minimum = 0;
 	absinfo.maximum = UEP_MAX_X;
-	evdev_set_absinfo(sc->evdev, ABS_X, &absinfo);
+	evdev_support_abs(sc->evdev, ABS_X, &absinfo);
 
 	absinfo.minimum = 0;
 	absinfo.maximum = UEP_MAX_Y;
-	evdev_set_absinfo(sc->evdev, ABS_Y, &absinfo);
+	evdev_support_abs(sc->evdev, ABS_Y, &absinfo);
 
 	evdev_register(dev, sc->evdev);
 #endif

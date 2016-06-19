@@ -307,11 +307,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			return (EINVAL);
 
 		uabs = (struct uinput_abs_setup *)data;
-		ret = evdev_support_abs(state->ucs_evdev, uabs->code);
-		if (ret)
-			return (ret);
-
-		return (evdev_set_absinfo(state->ucs_evdev, uabs->code,
+		return (evdev_support_abs(state->ucs_evdev, uabs->code,
 		    &uabs->absinfo));
 
 	case UI_SET_EVBIT:
@@ -333,7 +329,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	case UI_SET_ABSBIT:
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		return (evdev_support_abs(state->ucs_evdev, *(int *)data));
+		return (evdev_set_abs_bit(state->ucs_evdev, *(int *)data));
 
 	case UI_SET_MSCBIT:
 		if (state->ucs_state == UINPUT_RUNNING)

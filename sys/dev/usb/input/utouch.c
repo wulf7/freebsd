@@ -207,12 +207,6 @@ utouch_attach(device_t dev)
 	evdev_support_event(sc->sc_evdev, EV_REL);
 	evdev_support_event(sc->sc_evdev, EV_KEY);
 
-	if (sc->sc_flags & UTOUCH_FLAG_X_AXIS)
-		evdev_support_abs(sc->sc_evdev, ABS_X);
-
-	if (sc->sc_flags & UTOUCH_FLAG_Y_AXIS)
-		evdev_support_abs(sc->sc_evdev, ABS_Y);
-
 	if (sc->sc_flags & UTOUCH_FLAG_Z_AXIS)
 		evdev_support_rel(sc->sc_evdev, REL_WHEEL);
 
@@ -222,8 +216,10 @@ utouch_attach(device_t dev)
 	/* Report absolute axes information */
 	absinfo.minimum = 0;
 	absinfo.maximum = 0x7fff; /* XXX should read from HID descriptor */
-	evdev_set_absinfo(sc->sc_evdev, ABS_X, &absinfo);
-	evdev_set_absinfo(sc->sc_evdev, ABS_Y, &absinfo);
+	if (sc->sc_flags & UTOUCH_FLAG_X_AXIS)
+		evdev_support_abs(sc->sc_evdev, ABS_X, &absinfo);
+	if (sc->sc_flags & UTOUCH_FLAG_Y_AXIS)
+		evdev_support_abs(sc->sc_evdev, ABS_Y, &absinfo);
 
 	err = evdev_register(dev, sc->sc_evdev);
 	if (err)
