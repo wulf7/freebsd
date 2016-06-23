@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014 Jakub Wojciech Klama <jceel@FreeBSD.org>
+ * Copyright (c) 2015-2016 Vladimir Kondratyev <wulf@cicgroup.ru>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
