@@ -51,15 +51,15 @@ static uint16_t evdev_usb_scancodes[256] = {
 	KEY_U,	KEY_V,	KEY_W,	KEY_X,	KEY_Y,	KEY_Z,	KEY_1,	KEY_2,
 	KEY_3,	KEY_4,	KEY_5,	KEY_6,	KEY_7,	KEY_8,	KEY_9,	KEY_0,
 	/* 0x28 - 0x3f */
-	KEY_ENTER,	KEY_ESC,	KEY_BACKSPACE,	KEY_TAB, 
-	KEY_SPACE,	KEY_MINUS,	KEY_EQUAL,	KEY_LEFTBRACE, 
+	KEY_ENTER,	KEY_ESC,	KEY_BACKSPACE,	KEY_TAB,
+	KEY_SPACE,	KEY_MINUS,	KEY_EQUAL,	KEY_LEFTBRACE,
 	KEY_RIGHTBRACE,	KEY_BACKSLASH,	KEY_BACKSLASH,	KEY_SEMICOLON,
-	KEY_APOSTROPHE,	KEY_GRAVE,	KEY_COMMA,	KEY_DOT, 
+	KEY_APOSTROPHE,	KEY_GRAVE,	KEY_COMMA,	KEY_DOT,
 	KEY_SLASH,	KEY_CAPSLOCK,	KEY_F1,		KEY_F2,
 	KEY_F3,		KEY_F4,		KEY_F5,		KEY_F6,
 	/* 0x40 - 0x5f */
-	KEY_F7, 	KEY_F8,		KEY_F9,		KEY_F10, 
-	KEY_F11, 	KEY_F12,	KEY_SYSRQ,	KEY_SCROLLLOCK,
+	KEY_F7,		KEY_F8,		KEY_F9,		KEY_F10,
+	KEY_F11,	KEY_F12,	KEY_SYSRQ,	KEY_SCROLLLOCK,
 	KEY_PAUSE,	KEY_INSERT,	KEY_HOME,	KEY_PAGEUP,
 	KEY_DELETE,	KEY_END,	KEY_PAGEDOWN,	KEY_RIGHT,
 	KEY_LEFT,	KEY_DOWN,	KEY_UP,		KEY_NUMLOCK,
@@ -81,7 +81,7 @@ static uint16_t evdev_usb_scancodes[256] = {
 	KEY_KATAKANAHIRAGANA,	KEY_YEN,KEY_HENKAN,	KEY_MUHENKAN,
 	KEY_KPJPCOMMA,	NONE,		NONE,		NONE,
 	KEY_HANGEUL,	KEY_HANJA,	KEY_KATAKANA,	KEY_HIRAGANA,
-	KEY_ZENKAKUHANKAKU,	NONE,	NONE,		NONE,	
+	KEY_ZENKAKUHANKAKU,	NONE,	NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	/* 0xa0 - 0xbf */
@@ -90,12 +90,12 @@ static uint16_t evdev_usb_scancodes[256] = {
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
-	NONE, 		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	/* 0xc0 - 0xdf */
 	NONE,		NONE,		NONE,		NONE,
-	NONE, 		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
@@ -104,11 +104,11 @@ static uint16_t evdev_usb_scancodes[256] = {
 	NONE,		NONE,		NONE,		NONE,
 	/* 0xe0 - 0xff */
 	KEY_LEFTCTRL,	KEY_LEFTSHIFT,	KEY_LEFTALT,	KEY_LEFTMETA,
-	KEY_RIGHTCTRL,	KEY_RIGHTSHIFT,	KEY_RIGHTALT,	KEY_RIGHTMETA,	
+	KEY_RIGHTCTRL,	KEY_RIGHTSHIFT,	KEY_RIGHTALT,	KEY_RIGHTMETA,
 	KEY_PLAYPAUSE,	KEY_STOPCD,	KEY_PREVIOUSSONG,KEY_NEXTSONG,
 	KEY_EJECTCD,	KEY_VOLUMEUP,	KEY_VOLUMEDOWN,	KEY_MUTE,
 	KEY_WWW,	KEY_BACK,	KEY_FORWARD,	KEY_STOP,
-	KEY_FIND, 	KEY_SCROLLUP,	KEY_SCROLLDOWN,	KEY_EDIT,
+	KEY_FIND,	KEY_SCROLLUP,	KEY_SCROLLDOWN,	KEY_EDIT,
 	KEY_SLEEP,	KEY_COFFEE,	KEY_REFRESH,	KEY_CALC,
 	NONE,		NONE,		NONE,		NONE,
 
@@ -141,7 +141,7 @@ static uint16_t evdev_at_set1_scancodes[] = {
 	KEY_KP2,	KEY_KP3,	KEY_KP0,	KEY_KPDOT,
 	NONE,		NONE,		NONE,		KEY_F11,
 	KEY_F12,	NONE,		NONE,		NONE,
-	NONE, 		NONE,		NONE,		NONE,
+	NONE,		NONE,		NONE,		NONE,
 	/* 0x60 - 0x7f */
 	NONE,		NONE,		NONE,		NONE,
 	NONE,		NONE,		NONE,		NONE,
@@ -206,7 +206,6 @@ static uint16_t evdev_led_codes[] = {
 	LED_SCROLLL,	/* SLKED */
 };
 
-
 inline uint16_t
 evdev_hid2key(int scancode)
 {
@@ -243,8 +242,8 @@ evdev_scancode2key(int *state, int scancode)
 		*state = 0;
 		keycode = evdev_at_set1_scancodes[0x80 + (scancode & 0x7f)];
 		break;
-   	case 0xE1:	/* 0xE1 prefix */
-		/* 
+	case 0xE1:	/* 0xE1 prefix */
+		/*
 		 * The pause/break key on the 101 keyboard produces:
 		 * E1-1D-45 E1-9D-C5
 		 * Ctrl-pause/break produces:
@@ -255,7 +254,7 @@ evdev_scancode2key(int *state, int scancode)
 			*state = 0x1D;
 		return (NONE);
 		/* NOT REACHED */
-   	case 0x1D:	/* pause / break */
+	case 0x1D:	/* pause / break */
 		*state = 0;
 		if (scancode != 0x45)
 			return (NONE);

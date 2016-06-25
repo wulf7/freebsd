@@ -184,12 +184,12 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 
 	/* Initialize internal structures */
 	evdev->ev_dev = dev;
-	mtx_init(&evdev->ev_mtx, "evmtx", "evdev", MTX_DEF);
+	mtx_init(&evdev->ev_mtx, "evmtx", NULL, MTX_DEF);
 	LIST_INIT(&evdev->ev_clients);
 
 	if (dev != NULL)
 		strlcpy(evdev->ev_shortname, device_get_nameunit(dev), NAMELEN);
-	
+
 	if (evdev_event_supported(evdev, EV_REP) &&
 	    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
 		/* Initialize callout */
@@ -797,7 +797,7 @@ push:
 inline int
 evdev_sync(struct evdev_dev *evdev)
 {
-	
+
 	return (evdev_push_event(evdev, EV_SYN, SYN_REPORT, 1));
 }
 
@@ -805,7 +805,7 @@ evdev_sync(struct evdev_dev *evdev)
 inline int
 evdev_mt_sync(struct evdev_dev *evdev)
 {
-	
+
 	return (evdev_push_event(evdev, EV_SYN, SYN_MT_REPORT, 1));
 }
 
