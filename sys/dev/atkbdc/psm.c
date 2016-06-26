@@ -346,7 +346,9 @@ struct psm_softc {		/* Driver status information */
 	int		cmdcount;
 	struct sigio	*async;		/* Processes waiting for SIGIO */
 	int		extended_buttons;
+#ifdef	EVDEV
 	struct evdev_dev *evdev;
+#endif
 };
 static devclass_t psm_devclass;
 
