@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014 Jakub Wojciech Klama <jceel@FreeBSD.org>
+ * Copyright (c) 2015-2016 Vladimir Kondratyev <wulf@cicgroup.ru>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
+#include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/uio.h>
@@ -48,6 +50,14 @@
 #define	debugf(fmt, args...)
 #endif
 
+#define	UINPUT_BUFFER_SIZE	16
+
+#define	UINPUT_LOCKQ(state)		mtx_lock(&(state)->ucs_mtx)
+#define	UINPUT_UNLOCKQ(state)		mtx_unlock(&(state)->ucs_mtx)
+#define	UINPUT_LOCKQ_ASSERT(state)	mtx_assert(&(state)->ucs_mtx, MA_OWNED)
+#define UINPUT_EMPTYQ(state) \
+    ((state)->ucs_buffer_head == (state)->ucs_buffer_tail)
+
 enum uinput_state
 {
 	UINPUT_NEW = 0,
@@ -62,7 +72,11 @@ static d_read_t		uinput_read;
 static d_write_t	uinput_write;
 static d_ioctl_t	uinput_ioctl;
 static d_poll_t		uinput_poll;
+static d_kqfilter_t	uinput_kqfilter;
 static void uinput_dtor(void *);
+
+static int uinput_kqread(struct knote *kn, long hint);
+static void uinput_kqdetach(struct knote *kn);
 
 static struct cdevsw uinput_cdevsw = {
 	.d_version = D_VERSION,
@@ -71,6 +85,7 @@ static struct cdevsw uinput_cdevsw = {
 	.d_write = uinput_write,
 	.d_ioctl = uinput_ioctl,
 	.d_poll = uinput_poll,
+	.d_kqfilter = uinput_kqfilter,
 	.d_name = "uinput",
 };
 
@@ -80,23 +95,72 @@ static struct evdev_methods uinput_ev_methods = {
 	.ev_event = uinput_ev_event,
 };
 
+static struct filterops uinput_filterops = {
+	.f_isfd = 1,
+	.f_attach = NULL,
+	.f_detach = uinput_kqdetach,
+	.f_event = uinput_kqread,
+};
+
 struct uinput_cdev_state
 {
 	enum uinput_state	ucs_state;
 	struct evdev_dev *	ucs_evdev;
 	struct mtx		ucs_mtx;
+	size_t			ucs_buffer_head;
+	size_t			ucs_buffer_tail;
+	struct selinfo		ucs_selp;
+	bool			ucs_blocked;
+	bool			ucs_selected;
+	struct input_event      ucs_buffer[UINPUT_BUFFER_SIZE];
 };
 
+static void uinput_enqueue_event(struct uinput_cdev_state *, uint16_t,
+    uint16_t, int32_t);
 static int uinput_setup_provider(struct uinput_cdev_state *,
     struct uinput_user_dev *);
 static int uinput_cdev_create(void);
+static void uinput_notify(struct uinput_cdev_state *);
 
 static void
 uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
     uint16_t code, int32_t value)
 {
+	struct uinput_cdev_state *state = softc;
+
 	if (type == EV_LED)
 		evdev_push_event(evdev, type, code, value);
+
+	UINPUT_LOCKQ(state);
+	uinput_enqueue_event(state, type, code, value);
+	uinput_notify(state);
+	UINPUT_UNLOCKQ(state);
+}
+
+static void
+uinput_enqueue_event(struct uinput_cdev_state *state, uint16_t type,
+    uint16_t code, int32_t value)
+{
+	size_t head, tail;
+
+	UINPUT_LOCKQ_ASSERT(state);
+
+	head = state->ucs_buffer_head;
+	tail = (state->ucs_buffer_tail + 1) % UINPUT_BUFFER_SIZE;
+
+	microtime(&state->ucs_buffer[tail].time);
+	state->ucs_buffer[tail].type = type;
+	state->ucs_buffer[tail].code = code;
+	state->ucs_buffer[tail].value = value;
+	state->ucs_buffer_tail = tail;
+
+	/* If queue is full remove oldest event */
+	if (tail == head) {
+		debugf("state %p: buffer overflow", state);
+
+		head = (head + 1) % UINPUT_BUFFER_SIZE;
+		state->ucs_buffer_head = head;
+	}
 }
 
 static int
@@ -104,8 +168,12 @@ uinput_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	struct uinput_cdev_state *state;
 
-	state = malloc(sizeof(struct uinput_cdev_state), M_EVDEV, M_WAITOK | M_ZERO);
+	state = malloc(sizeof(struct uinput_cdev_state), M_EVDEV,
+	    M_WAITOK | M_ZERO);
 	state->ucs_evdev = evdev_alloc();
+
+	mtx_init(&state->ucs_mtx, "uinput", NULL, MTX_DEF);
+	knlist_init_mtx(&state->ucs_selp.si_note, &state->ucs_mtx);
 
 	devfs_set_cdevpriv(state, uinput_dtor);
 	return (0);
@@ -120,6 +188,11 @@ uinput_dtor(void *data)
 		evdev_unregister(NULL, state->ucs_evdev);
 
 	evdev_free(state->ucs_evdev);
+
+	knlist_clear(&state->ucs_selp.si_note, 0);
+	seldrain(&state->ucs_selp);
+	knlist_destroy(&state->ucs_selp.si_note);
+	mtx_destroy(&state->ucs_mtx);
 	free(data, M_EVDEV);
 }
 
@@ -127,8 +200,8 @@ static int
 uinput_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct uinput_cdev_state *state;
-	struct evdev_dev *evdev;
-	int ret = 0;
+	struct input_event *event;
+	int remaining, ret;
 
 	debugf("uinput: read %zd bytes by thread %d", uio->uio_resid,
 	    uio->uio_td->td_tid);
@@ -137,14 +210,40 @@ uinput_read(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	evdev = state->ucs_evdev;
-
-	if (uio->uio_resid % sizeof(struct input_event) != 0) {
-		debugf("read size not multiple of struct input_event size");
+	/* Zero-sized reads are allowed for error checking */
+	if (uio->uio_resid != 0 && uio->uio_resid < sizeof(struct input_event))
 		return (EINVAL);
+
+	remaining = uio->uio_resid / sizeof(struct input_event);
+
+	UINPUT_LOCKQ(state);
+
+	if (UINPUT_EMPTYQ(state)) {
+		if (ioflag & O_NONBLOCK)
+			ret = EWOULDBLOCK;
+		else {
+			if (remaining != 0) {
+				state->ucs_blocked = true;
+				ret = mtx_sleep(state, &state->ucs_mtx,
+				    PCATCH, "uiread", 0);
+			}
+		}
 	}
 
-	return (0);
+	while (ret == 0 && !UINPUT_EMPTYQ(state) && remaining > 0) {
+		event = &state->ucs_buffer[state->ucs_buffer_head];
+		state->ucs_buffer_head = (state->ucs_buffer_head + 1) %
+		    UINPUT_BUFFER_SIZE;
+		remaining--;
+
+		UINPUT_UNLOCKQ(state);
+		ret = uiomove(event, sizeof(struct input_event), uio);
+		UINPUT_LOCKQ(state);
+	}
+
+	UINPUT_UNLOCKQ(state);
+
+	return (ret);
 }
 
 static int
@@ -238,13 +337,93 @@ uinput_setup_provider(struct uinput_cdev_state *state,
 static int
 uinput_poll(struct cdev *dev, int events, struct thread *td)
 {
+	struct uinput_cdev_state *state;
 	int revents = 0;
+
+	debugf("uinput: poll by thread %d", td->td_tid);
+
+	if (devfs_get_cdevpriv((void **)&state) != 0)
+		return (POLLNVAL);
 
 	/* Always allow write */
 	if (events & (POLLOUT | POLLWRNORM))
 		revents |= (events & (POLLOUT | POLLWRNORM));
 
+	if (events & (POLLIN | POLLRDNORM)) {
+		UINPUT_LOCKQ(state);
+		if (!UINPUT_EMPTYQ(state))
+			revents = events & (POLLIN | POLLRDNORM);
+		else {
+			state->ucs_selected = true;
+			selrecord(td, &state->ucs_selp);
+		}
+		UINPUT_UNLOCKQ(state);
+	}
+
 	return (revents);
+}
+
+static int
+uinput_kqfilter(struct cdev *dev, struct knote *kn)
+{
+	struct uinput_cdev_state *state;
+	int ret;
+
+	ret = devfs_get_cdevpriv((void **)&state);
+	if (ret != 0)
+		return (ret);
+
+	switch(kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &uinput_filterops;
+		break;
+	default:
+		return(EINVAL);
+	}
+	kn->kn_hook = (caddr_t)state;
+
+	knlist_add(&state->ucs_selp.si_note, kn, 0);
+	return (0);
+}
+
+static int
+uinput_kqread(struct knote *kn, long hint)
+{
+	struct uinput_cdev_state *state;
+	int ret;
+
+	state = (struct uinput_cdev_state *)kn->kn_hook;
+
+	UINPUT_LOCKQ_ASSERT(state);
+
+	ret = !UINPUT_EMPTYQ(state);
+	return (ret);
+}
+
+static void
+uinput_kqdetach(struct knote *kn)
+{
+	struct uinput_cdev_state *state;
+
+	state = (struct uinput_cdev_state *)kn->kn_hook;
+	knlist_remove(&state->ucs_selp.si_note, kn, 0);
+}
+
+static void
+uinput_notify(struct uinput_cdev_state *state)
+{
+
+	UINPUT_LOCKQ_ASSERT(state);
+
+	if (state->ucs_blocked) {
+		state->ucs_blocked = false;
+		wakeup(state);
+	}
+	if (state->ucs_selected) {
+		state->ucs_selected = false;
+		selwakeup(&state->ucs_selp);
+	}
+	KNOTE_LOCKED(&state->ucs_selp.si_note, 0);
 }
 
 static int
