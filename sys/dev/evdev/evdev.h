@@ -191,6 +191,9 @@ struct evdev_client
     mtx_assert(&(client)->ec_buffer_mtx, MA_OWNED)
 #define	EVDEV_CLIENT_EMPTYQ(client) \
     ((client)->ec_buffer_head == (client)->ec_buffer_ready)
+#define	EVDEV_CLIENT_SIZEQ(client) \
+    (((client)->ec_buffer_ready + (client)->ec_buffer_size - \
+      (client)->ec_buffer_head) % (client)->ec_buffer_size)
 
 /* Input device interface: */
 struct evdev_dev *evdev_alloc(void);

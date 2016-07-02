@@ -305,6 +305,7 @@ evdev_kqread(struct knote *kn, long hint)
 
 	EVDEV_CLIENT_LOCKQ_ASSERT(client);
 
+	kn->kn_data = EVDEV_CLIENT_SIZEQ(client) * sizeof(struct input_event);
 	ret = !EVDEV_CLIENT_EMPTYQ(client);
 	return (ret);
 }
@@ -354,6 +355,13 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		else
 			client->ec_async = false;
 
+		return (0);
+
+	case FIONREAD:
+		EVDEV_CLIENT_LOCKQ(client);
+		*(int *)data =
+		    EVDEV_CLIENT_SIZEQ(client) * sizeof(struct input_event);
+		EVDEV_CLIENT_UNLOCKQ(client);
 		return (0);
 	}
 
