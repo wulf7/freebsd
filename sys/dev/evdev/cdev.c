@@ -190,7 +190,8 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 	while (ret == 0 && !EVDEV_CLIENT_EMPTYQ(client) && remaining > 0) {
 		event = &client->ec_buffer[client->ec_buffer_head];
-		client->ec_buffer_head = (client->ec_buffer_head + 1) % client->ec_buffer_size;
+		client->ec_buffer_head =
+		    (client->ec_buffer_head + 1) % client->ec_buffer_size;
 		remaining--;
 
 		EVDEV_CLIENT_UNLOCKQ(client);
@@ -302,9 +303,9 @@ evdev_kqread(struct knote *kn, long hint)
 
 	client = (struct evdev_client *)kn->kn_hook;
 
-	EVDEV_CLIENT_LOCKQ(client);
+	EVDEV_CLIENT_LOCKQ_ASSERT(client);
+
 	ret = !EVDEV_CLIENT_EMPTYQ(client);
-	EVDEV_CLIENT_UNLOCKQ(client);
 	return (ret);
 }
 
