@@ -98,14 +98,14 @@ struct input_keymap_entry {
 #define	EVIOCGABS(abs)		_IOR(EVDEV_IOC_MAGIC, 0x40 + (abs), struct input_absinfo)	/* get abs value/limits */
 #define	EVIOCSABS(abs)		_IOW(EVDEV_IOC_MAGIC, 0xc0 + (abs), struct input_absinfo)	/* set abs value/limits */
 
-#define	EVIOCSFF		_IOC(IOC_IN, EVDEV_IOC_MAGIC, 0x80, sizeof(struct ff_effect))	/* send a force effect to a force feedback device */
-#define	EVIOCRMFF		_IOW(EVDEV_IOC_MAGIC, 0x81, int)			/* Erase a force effect */
-#define	EVIOCGEFFECTS		_IOR(EVDEV_IOC_MAGIC, 0x84, int)			/* Report number of effects playable at the same time */
+#define	EVIOCSFF		_IOW(EVDEV_IOC_MAGIC, 0x80, struct ff_effect)	/* send a force effect to a force feedback device */
+#define	EVIOCRMFF		_IOWINT(EVDEV_IOC_MAGIC, 0x81)			/* Erase a force effect */
+#define	EVIOCGEFFECTS		_IOR(EVDEV_IOC_MAGIC, 0x84, int)		/* Report number of effects playable at the same time */
 
 #define	EVIOCGRAB		_IOWINT(EVDEV_IOC_MAGIC, 0x90)			/* Grab/Release device */
 #define	EVIOCREVOKE		_IOWINT(EVDEV_IOC_MAGIC, 0x91)			/* Revoke device access */
 
-#define	EVIOCSCLOCKID		_IOW(EVDEV_IOC_MAGIC, 0xa0, int)			/* Set clockid to be used for timestamps */
+#define	EVIOCSCLOCKID		_IOW(EVDEV_IOC_MAGIC, 0xa0, int)		/* Set clockid to be used for timestamps */
 
 /*
  * Device properties and quirks
