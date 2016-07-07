@@ -234,6 +234,7 @@ int evdev_grab_client(struct evdev_dev *, struct evdev_client *);
 int evdev_release_client(struct evdev_dev *, struct evdev_client *);
 void evdev_client_push(struct evdev_client *, uint16_t, uint16_t, int32_t);
 void evdev_notify_event(struct evdev_client *);
+void evdev_revoke_client(struct evdev_client *);
 
 /* Multitouch related functions: */
 void evdev_mt_init(struct evdev_dev *);

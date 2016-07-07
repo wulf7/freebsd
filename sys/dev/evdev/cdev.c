@@ -137,14 +137,15 @@ evdev_dtor(void *data)
 {
 	struct evdev_client *client = (struct evdev_client *)data;
 
-	knlist_clear(&client->ec_selp.si_note, 0);
-	seldrain(&client->ec_selp);
-	knlist_destroy(&client->ec_selp.si_note);
-	funsetown(&client->ec_sigio);
 	EVDEV_LOCK(client->ec_evdev);
 	if (!client->ec_revoked)
 		evdev_dispose_client(client->ec_evdev, client);
 	EVDEV_UNLOCK(client->ec_evdev);
+
+	knlist_clear(&client->ec_selp.si_note, 0);
+	seldrain(&client->ec_selp);
+	knlist_destroy(&client->ec_selp.si_note);
+	funsetown(&client->ec_sigio);
 	mtx_destroy(&client->ec_buffer_mtx);
 	free(client, M_EVDEV);
 }
@@ -152,7 +153,6 @@ evdev_dtor(void *data)
 static int
 evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
-	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
 	struct input_event *event;
 	int ret = 0;
@@ -165,7 +165,7 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || evdev == NULL)
+	if (client->ec_revoked)
 		return (ENODEV);
 
 	/* Zero-sized reads are allowed for error checking */
@@ -240,7 +240,6 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 evdev_poll(struct cdev *dev, int events, struct thread *td)
 {
-	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
 	int ret;
 	int revents = 0;
@@ -251,7 +250,7 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 	if (ret != 0)
 		return (POLLNVAL);
 
-	if (client->ec_revoked || evdev == NULL)
+	if (client->ec_revoked)
 		return (POLLNVAL);
 
 	if (events & (POLLIN | POLLRDNORM)) {
@@ -271,7 +270,6 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 static int
 evdev_kqfilter(struct cdev *dev, struct knote *kn)
 {
-	struct evdev_dev *evdev = dev->si_drv1;
 	struct evdev_client *client;
 	int ret;
 
@@ -279,7 +277,7 @@ evdev_kqfilter(struct cdev *dev, struct knote *kn)
 	if (ret != 0)
 		return (ret);
 
-	if (client->ec_revoked || evdev == NULL)
+	if (client->ec_revoked)
 		return (ENODEV);
 
 	switch(kn->kn_filter) {
@@ -305,8 +303,14 @@ evdev_kqread(struct knote *kn, long hint)
 
 	EVDEV_CLIENT_LOCKQ_ASSERT(client);
 
-	kn->kn_data = EVDEV_CLIENT_SIZEQ(client) * sizeof(struct input_event);
-	ret = !EVDEV_CLIENT_EMPTYQ(client);
+	if (client->ec_revoked) {
+		kn->kn_flags |= EV_EOF;
+		ret = 1;
+	} else {
+		kn->kn_data = EVDEV_CLIENT_SIZEQ(client) *
+		    sizeof(struct input_event);
+		ret = !EVDEV_CLIENT_EMPTYQ(client);
+	}
 	return (ret);
 }
 
@@ -465,9 +469,10 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			return (EINVAL);
 
 		EVDEV_LOCK(evdev);
-		if (dev->si_drv1 != NULL && !client->ec_revoked)
+		if (dev->si_drv1 != NULL && !client->ec_revoked) {
 			evdev_dispose_client(evdev, client);
-		client->ec_revoked = true;
+			evdev_revoke_client(client);
+		}
 		EVDEV_UNLOCK(evdev);
 		return (0);
 
@@ -629,8 +634,19 @@ evdev_ioctl_eviocgbit(struct evdev_dev *evdev, int type, int len, caddr_t data)
 }
 
 void
+evdev_revoke_client(struct evdev_client *client)
+{
+
+	EVDEV_LOCK_ASSERT(client->ec_evdev);
+
+	client->ec_revoked = true;
+}
+
+void
 evdev_notify_event(struct evdev_client *client)
 {
+
+	EVDEV_CLIENT_LOCKQ_ASSERT(client);
 
 	if (client->ec_blocked) {
 		client->ec_blocked = false;

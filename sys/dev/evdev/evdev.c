@@ -239,6 +239,8 @@ evdev_unregister(device_t dev, struct evdev_dev *evdev)
 	evdev->ev_cdev->si_drv1 = NULL;
 	/* Wake up sleepers */
 	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+		evdev_revoke_client(client);
+		evdev_dispose_client(evdev, client);
 		EVDEV_CLIENT_LOCKQ(client);
 		evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
