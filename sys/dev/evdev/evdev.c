@@ -35,6 +35,7 @@
 #include <sys/conf.h>
 #include <sys/malloc.h>
 #include <sys/bitstring.h>
+#include <sys/sysctl.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -49,6 +50,10 @@
 #define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args)
 #else
 #define	debugf(fmt, args...)
+#endif
+
+#ifdef FEATURE
+FEATURE(evdev, "Input event devices support");
 #endif
 
 enum evdev_sparse_result
