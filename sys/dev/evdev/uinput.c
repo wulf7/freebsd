@@ -42,6 +42,7 @@
 #include <dev/evdev/input.h>
 #include <dev/evdev/uinput.h>
 #include <dev/evdev/evdev.h>
+#include <dev/evdev/evdev_private.h>
 
 #undef	DEBUG
 #ifdef DEBUG
@@ -299,7 +300,7 @@ uinput_setup_dev(struct uinput_cdev_state *state, struct input_id *id,
 		return (EINVAL);
 
 	evdev_set_name(state->ucs_evdev, name);
-	memcpy(&state->ucs_evdev->ev_id, id, sizeof(struct input_id));
+	evdev_set_id(state->ucs_evdev, id);
 	state->ucs_state = UINPUT_CONFIGURED;
 
 	return (0);

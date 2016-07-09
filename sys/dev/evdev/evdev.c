@@ -43,6 +43,7 @@
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
+#include <dev/evdev/evdev_private.h>
 
 #ifdef DEBUG
 #define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args)
@@ -263,6 +264,13 @@ evdev_set_name(struct evdev_dev *evdev, const char *name)
 {
 
 	snprintf(evdev->ev_name, NAMELEN, "%s", name);
+}
+
+inline void
+evdev_set_id(struct evdev_dev *evdev, const struct input_id *id)
+{
+
+	memcpy(&evdev->ev_id, id, sizeof(struct input_id));
 }
 
 inline void

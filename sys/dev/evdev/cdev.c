@@ -44,6 +44,7 @@
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
+#include <dev/evdev/evdev_private.h>
 
 #undef	DEBUG
 #ifdef DEBUG
