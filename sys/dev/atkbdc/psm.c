@@ -3764,7 +3764,7 @@ psmsoftintr(void *arg)
 	}
 
 #ifdef EVDEV
-	if (sc->state & PSM_EV_OPEN) {
+	if (evdev_rcpt_mask & EVDEV_RCPT_HW_MOUSE && sc->state & PSM_EV_OPEN) {
 		if (x != 0 || y != 0) {
 			evdev_push_event(sc->evdev, EV_REL, REL_X, x);
 			evdev_push_event(sc->evdev, EV_REL, REL_Y, -y);

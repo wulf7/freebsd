@@ -890,22 +890,19 @@ ums_put_queue(struct ums_softc *sc, int32_t dx, int32_t dy,
 		    sc->sc_mode.packetsize, 1);
 
 #ifdef EVDEV
-		/* Push evdev event */
-		if (dx != 0 || dy != 0) {
+		if (evdev_rcpt_mask & EVDEV_RCPT_HW_MOUSE) {
+			/* Push evdev event */
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_X, dx);
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_Y, -dy);
-		}
-		if (dz != 0)
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_WHEEL, -dz);
-		if (dt != 0)
 			evdev_push_event(sc->sc_evdev, EV_REL, REL_HWHEEL, dt);
-
-		evdev_push_mouse_btn(sc->sc_evdev,
-		    (buttons & ~MOUSE_STDBUTTONS) |
-		    (buttons & (1 << 2) ? MOUSE_BUTTON1DOWN : 0) |
-		    (buttons & (1 << 1) ? MOUSE_BUTTON2DOWN : 0) |
-		    (buttons & (1 << 0) ? MOUSE_BUTTON3DOWN : 0));
-		evdev_sync(sc->sc_evdev);
+			evdev_push_mouse_btn(sc->sc_evdev,
+			    (buttons & ~MOUSE_STDBUTTONS) |
+			    (buttons & (1 << 2) ? MOUSE_BUTTON1DOWN : 0) |
+			    (buttons & (1 << 1) ? MOUSE_BUTTON2DOWN : 0) |
+			    (buttons & (1 << 0) ? MOUSE_BUTTON3DOWN : 0));
+			evdev_sync(sc->sc_evdev);
+		}
 #endif
 	} else {
 		DPRINTF("Buffer full, discarded packet\n");

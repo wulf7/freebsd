@@ -421,8 +421,11 @@ ukbd_put_key(struct ukbd_softc *sc, uint32_t key)
 	    (key & KEY_RELEASE) ? "released" : "pressed");
 
 #ifdef EVDEV
-	evdev_push_event(sc->sc_evdev, EV_KEY, evdev_hid2key(KEY_INDEX(key)), !(key & KEY_RELEASE));
-	evdev_sync(sc->sc_evdev);
+	if (evdev_rcpt_mask & EVDEV_RCPT_HW_KBD) {
+		evdev_push_event(sc->sc_evdev, EV_KEY,
+		    evdev_hid2key(KEY_INDEX(key)), !(key & KEY_RELEASE));
+		evdev_sync(sc->sc_evdev);
+	}
 #endif
 
 	if (sc->sc_inputs < UKBD_IN_BUF_SIZE) {

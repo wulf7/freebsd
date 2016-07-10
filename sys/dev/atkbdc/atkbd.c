@@ -684,7 +684,8 @@ next_code:
 
 #ifdef EVDEV
 	/* push evdev event */
-	if (state->ks_evdev != NULL && state->ks_evdev_opened) {
+	if (evdev_rcpt_mask & EVDEV_RCPT_HW_KBD &&
+	    state->ks_evdev != NULL && state->ks_evdev_opened) {
 		uint16_t key = evdev_scancode2key(&state->ks_evdev_state,
 		    scancode);
 

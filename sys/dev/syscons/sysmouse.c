@@ -88,7 +88,7 @@ static void
 smdev_evdev_write(int x, int y, int z, int buttons)
 {
 
-	if (sysmouse_evdev == NULL)
+	if (sysmouse_evdev == NULL || !(evdev_rcpt_mask & EVDEV_RCPT_SYSMOUSE))
 		return;
 
 	evdev_push_event(sysmouse_evdev, EV_REL, REL_X, x);
