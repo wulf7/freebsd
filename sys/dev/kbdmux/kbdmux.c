@@ -527,9 +527,10 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_support_led(evdev, LED_CAPSL);
 		evdev_support_led(evdev, LED_SCROLLL);
 
-
-		evdev_register(NULL, evdev);
-		state->ks_evdev = evdev;
+		if (evdev_register(NULL, evdev))
+			evdev_free(evdev);
+		else
+			state->ks_evdev = evdev;
 		state->ks_evdev_state = 0;
 #endif
 
