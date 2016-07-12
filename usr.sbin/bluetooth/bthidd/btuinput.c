@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/kbio.h>
 #include <sys/queue.h>
+#include <sys/sysctl.h>
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/uinput.h>
@@ -41,6 +42,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 #include <usbhid.h>
 
@@ -247,6 +249,35 @@ bail_out:
 	return (-1);
 }
 
+/* from sys/dev/evdev/evdev.h */
+#define	EVDEV_RCPT_HW_MOUSE	(1<<2)
+#define	EVDEV_RCPT_HW_KBD	(1<<3)
+
+static int
+uinput_get_rcpt_mask(void)
+{
+	static struct timespec last = { 0, 0 };
+	struct timespec now;
+	static int mask = 0xF;
+	size_t len;
+	time_t elapsed;
+
+	if (clock_gettime(CLOCK_UPTIME_FAST, &now) == -1)
+		return mask;
+
+	elapsed = now.tv_sec - last.tv_sec;
+	if (now.tv_nsec < last.tv_nsec)
+		elapsed--;
+
+#define	MASK_POLL_INTERVAL	5 /* seconds */
+	if (elapsed >= MASK_POLL_INTERVAL) {
+		len = sizeof(mask);
+		sysctlbyname("kern.evdev.rcpt_mask", &mask, &len, NULL, 0);
+		last = now;
+	}
+	return mask;
+}
+
 static int
 uinput_write_event(int fd, uint16_t type, uint16_t code, int32_t value)
 {
@@ -263,7 +294,11 @@ int
 uinput_report_mouse(bthid_session_p s, struct mouse_info *mi)
 {
 	size_t i;
-	int mask, fd;
+	int rcpt_mask, mask, fd;
+
+	rcpt_mask = uinput_get_rcpt_mask();
+	if (!(rcpt_mask & EVDEV_RCPT_HW_MOUSE))
+		return (0);
 
 	fd = s->uinput;
 	if (mi->u.data.x != 0 || mi->u.data.y != 0) {
@@ -301,6 +336,11 @@ uinput_kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd)
 {
 	size_t i;
 	uint16_t n;
+	int rcpt_mask;
+
+	rcpt_mask = uinput_get_rcpt_mask();
+	if (!(rcpt_mask & EVDEV_RCPT_HW_KBD))
+		return;
 
 	for (i = fb; i < nitems(keycodes); i++) {
 		if (bit_test(m, i)) {
