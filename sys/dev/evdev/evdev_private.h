@@ -165,8 +165,8 @@ int evdev_inject_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 int evdev_cdev_create(struct evdev_dev *);
 int evdev_cdev_destroy(struct evdev_dev *);
 bool evdev_event_supported(struct evdev_dev *, uint16_t);
-int evdev_set_abs_bit(struct evdev_dev *, uint16_t);
-int evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
+void evdev_set_abs_bit(struct evdev_dev *, uint16_t);
+void evdev_set_absinfo(struct evdev_dev *, uint16_t, struct input_absinfo *);
 
 /* Client interface: */
 int evdev_register_client(struct evdev_dev *, struct evdev_client *);

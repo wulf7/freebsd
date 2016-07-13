@@ -434,10 +434,12 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	struct uinput_cdev_state *state;
 	struct uinput_setup *us;
 	struct uinput_abs_setup *uabs;
-	int ret, len;
+	int ret, len, intdata;
 	char buf[NAMELEN];
 
 	len = IOCPARM_LEN(cmd);
+	if ((cmd & IOC_DIRMASK) == IOC_VOID && len == sizeof(int))
+		intdata = *(int *)data;
 
 	debugf("uinput: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
 
@@ -487,47 +489,65 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			return (EINVAL);
 
 		uabs = (struct uinput_abs_setup *)data;
-		return (evdev_support_abs(state->ucs_evdev, uabs->code,
-		    &uabs->absinfo));
+		if (uabs->code > ABS_MAX || uabs->code < 0)
+			return (EINVAL);
+
+		evdev_support_abs(state->ucs_evdev, uabs->code,
+		    &uabs->absinfo);
+		return (0);
 
 	case UI_SET_EVBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > EV_MAX || intdata < 0)
 			return (EINVAL);
-
-		return (evdev_support_event(state->ucs_evdev, *(int *)data));
+		evdev_support_event(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_KEYBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > KEY_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_key(state->ucs_evdev, *(int *)data));
+		evdev_support_key(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_RELBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > REL_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_rel(state->ucs_evdev, *(int *)data));
+		evdev_support_rel(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_ABSBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > ABS_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_set_abs_bit(state->ucs_evdev, *(int *)data));
+		evdev_set_abs_bit(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_MSCBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > MSC_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_msc(state->ucs_evdev, *(int *)data));
+		evdev_support_msc(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_LEDBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > LED_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_led(state->ucs_evdev, *(int *)data));
+		evdev_support_led(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_SNDBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > SND_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_snd(state->ucs_evdev, *(int *)data));
+		evdev_support_snd(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_FFBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > FF_MAX || intdata < 0)
 			return (EINVAL);
 		/* Fake unsupported ioctl */
 		return (0);
@@ -545,14 +565,18 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case UI_SET_SWBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > SW_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_sw(state->ucs_evdev, *(int *)data));
+		evdev_support_sw(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_SET_PROPBIT:
-		if (state->ucs_state == UINPUT_RUNNING)
+		if (state->ucs_state == UINPUT_RUNNING ||
+		    intdata > INPUT_PROP_MAX || intdata < 0)
 			return (EINVAL);
-		return (evdev_support_prop(state->ucs_evdev, *(int *)data));
+		evdev_support_prop(state->ucs_evdev, intdata);
+		return (0);
 
 	case UI_BEGIN_FF_UPLOAD:
 	case UI_END_FF_UPLOAD:

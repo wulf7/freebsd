@@ -100,18 +100,18 @@ int evdev_unregister(device_t, struct evdev_dev *);
 int evdev_push_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 int evdev_sync(struct evdev_dev *);
 int evdev_mt_sync(struct evdev_dev *);
-int evdev_support_prop(struct evdev_dev *, uint16_t);
-int evdev_support_event(struct evdev_dev *, uint16_t);
-int evdev_support_key(struct evdev_dev *, uint16_t);
-int evdev_support_rel(struct evdev_dev *, uint16_t);
-int evdev_support_abs(struct evdev_dev *, uint16_t, struct input_absinfo *);
-int evdev_support_msc(struct evdev_dev *, uint16_t);
-int evdev_support_led(struct evdev_dev *, uint16_t);
-int evdev_support_snd(struct evdev_dev *, uint16_t);
-int evdev_support_sw(struct evdev_dev *, uint16_t);
+void evdev_support_prop(struct evdev_dev *, uint16_t);
+void evdev_support_event(struct evdev_dev *, uint16_t);
+void evdev_support_key(struct evdev_dev *, uint16_t);
+void evdev_support_rel(struct evdev_dev *, uint16_t);
+void evdev_support_abs(struct evdev_dev *, uint16_t, struct input_absinfo *);
+void evdev_support_msc(struct evdev_dev *, uint16_t);
+void evdev_support_led(struct evdev_dev *, uint16_t);
+void evdev_support_snd(struct evdev_dev *, uint16_t);
+void evdev_support_sw(struct evdev_dev *, uint16_t);
 void evdev_set_repeat_params(struct evdev_dev *, uint16_t, int);
 int evdev_set_report_size(struct evdev_dev *, size_t);
-int evdev_set_flag(struct evdev_dev *, uint16_t);
+void evdev_set_flag(struct evdev_dev *, uint16_t);
 
 /* Multitouch related functions: */
 int32_t evdev_get_mt_slot_by_tracking_id(struct evdev_dev *, int32_t);

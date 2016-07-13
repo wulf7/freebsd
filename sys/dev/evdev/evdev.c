@@ -308,141 +308,109 @@ evdev_set_methods(struct evdev_dev *evdev, void *softc,
 	evdev->ev_softc = softc;
 }
 
-inline int
+inline void
 evdev_support_prop(struct evdev_dev *evdev, uint16_t prop)
 {
 
-	if (prop >= INPUT_PROP_CNT)
-		return (EINVAL);
-
+	KASSERT(prop < INPUT_PROP_CNT, ("invalid evdev input property"));
 	bit_set(evdev->ev_prop_flags, prop);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_event(struct evdev_dev *evdev, uint16_t type)
 {
 
-	if (type >= EV_CNT)
-		return (EINVAL);
-
+	KASSERT(type < EV_CNT, ("invalid evdev event property"));
 	bit_set(evdev->ev_type_flags, type);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_key(struct evdev_dev *evdev, uint16_t code)
 {
 
-	if (code >= KEY_CNT)
-		return (EINVAL);
-
+	KASSERT(code < KEY_CNT, ("invalid evdev key property"));
 	bit_set(evdev->ev_key_flags, code);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_rel(struct evdev_dev *evdev, uint16_t code)
 {
 
-	if (code >= REL_CNT)
-		return (EINVAL);
-
+	KASSERT(code < REL_CNT, ("invalid evdev rel property"));
 	bit_set(evdev->ev_rel_flags, code);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_abs(struct evdev_dev *evdev, uint16_t code,
     struct input_absinfo *absinfo)
 {
-	int ret;
 
-	ret = evdev_set_absinfo(evdev, code, absinfo);
-	if (ret)
-		return (ret);
-
-	return (evdev_set_abs_bit(evdev, code));
+	KASSERT(code < ABS_CNT, ("invalid evdev abs property"));
+	evdev_set_abs_bit(evdev, code);
+	evdev_set_absinfo(evdev, code, absinfo);
 }
 
-inline int
+inline void
 evdev_set_abs_bit(struct evdev_dev *evdev, uint16_t code)
 {
-	if (code >= ABS_CNT)
-		return (EINVAL);
 
+	KASSERT(code < ABS_CNT, ("invalid evdev abs property"));
 	if (evdev->ev_absinfo == NULL)
 		evdev->ev_absinfo = evdev_alloc_absinfo();
-
 	bit_set(evdev->ev_abs_flags, code);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_msc(struct evdev_dev *evdev, uint16_t code)
 {
 
-	if (code >= MSC_CNT)
-		return (EINVAL);
-
+	KASSERT(code < MSC_CNT, ("invalid evdev msc property"));
 	bit_set(evdev->ev_msc_flags, code);
-	return (0);
 }
 
 
-inline int
+inline void
 evdev_support_led(struct evdev_dev *evdev, uint16_t code)
 {
 
-	if (code >= LED_CNT)
-		return (EINVAL);
-
+	KASSERT(code < LED_CNT, ("invalid evdev led property"));
 	bit_set(evdev->ev_led_flags, code);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_snd(struct evdev_dev *evdev, uint16_t code)
 {
 
-	if (code >= SND_CNT)
-		return (EINVAL);
-
+	KASSERT(code < SND_CNT, ("invalid evdev snd property"));
 	bit_set(evdev->ev_snd_flags, code);
-	return (0);
 }
 
-inline int
+inline void
 evdev_support_sw(struct evdev_dev *evdev, uint16_t code)
 {
-	if (code >= SW_CNT)
-		return (EINVAL);
 
+	KASSERT(code < SW_CNT, ("invalid evdev sw property"));
 	bit_set(evdev->ev_sw_flags, code);
-	return (0);
 }
 
 bool
 evdev_event_supported(struct evdev_dev *evdev, uint16_t type)
 {
 
-	if (type >= EV_CNT)
-		return (false);
-
+	KASSERT(type < EV_CNT, ("invalid evdev event property"));
 	return (bit_test(evdev->ev_type_flags, type));
 }
 
-inline int
+inline void
 evdev_set_absinfo(struct evdev_dev *evdev, uint16_t axis,
     struct input_absinfo *absinfo)
 {
 
-	if (axis >= ABS_CNT)
-		return (EINVAL);
+	KASSERT(axis < ABS_CNT, ("invalid evdev abs property"));
 
 	if (axis == ABS_MT_SLOT &&
 	    (absinfo->maximum < 1 || absinfo->maximum >= MAX_MT_SLOTS))
-		return (EINVAL);
+		return;
 
 	if (evdev->ev_absinfo == NULL)
 		evdev->ev_absinfo = evdev_alloc_absinfo();
@@ -452,8 +420,6 @@ evdev_set_absinfo(struct evdev_dev *evdev, uint16_t axis,
 	else
 		memcpy(&evdev->ev_absinfo[axis], absinfo,
 		    sizeof(struct input_absinfo));
-
-	return (0);
 }
 
 inline void
@@ -464,21 +430,21 @@ evdev_set_repeat_params(struct evdev_dev *evdev, uint16_t property, int value)
 	evdev->ev_rep[property] = value;
 }
 
-inline int
+inline void
 evdev_set_flag(struct evdev_dev *evdev, uint16_t flag)
 {
 
-	if (flag >= EVDEV_FLAG_CNT)
-		return (EINVAL);
-
+	KASSERT(flag < EVDEV_FLAG_CNT, ("invalid evdev flag property"));
 	bit_set(evdev->ev_flags, flag);
-	return(0);
 }
 
 static int
 evdev_check_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
+
+	if (type >= EV_CNT)
+		return (EINVAL);
 
 	/* Allow SYN events implicitly */
 	if (type != EV_SYN && !evdev_event_supported(evdev, type))
