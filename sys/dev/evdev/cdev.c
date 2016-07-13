@@ -497,14 +497,14 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGPHYS(0):
-		if (evdev->ev_dev == NULL && evdev->ev_shortname[0] == 0)
+		if (evdev->ev_shortname[0] == 0)
 			return (ENOENT);
 
 		strlcpy(data, evdev->ev_shortname, len);
 		return (0);
 
 	case EVIOCGUNIQ(0):
-		if (evdev->ev_dev == NULL && evdev->ev_serial[0] == 0)
+		if (evdev->ev_serial[0] == 0)
 			return (ENOENT);
 
 		strlcpy(data, evdev->ev_serial, len);

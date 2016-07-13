@@ -86,12 +86,12 @@ terasic_mtl_touch_attach(struct terasic_mtl_softc *sc)
 	struct input_absinfo absinfo;
 	sc->mtl_evdev = evdev_alloc();
 	evdev_set_name(sc->mtl_evdev, device_get_desc(sc->mtl_dev));
+	evdev_set_phys(sc->mtl_evdev, device_get_nameunit(sc->mtl_dev));
+	evdev_set_id(sc->mtl_evdev, BUS_HOST, 0, 0, 0);
 	evdev_set_methods(sc->mtl_evdev, sc, &terasic_mtl_ev_methods);
 	evdev_support_event(sc->mtl_evdev, EV_SYN);
 	evdev_support_event(sc->mtl_evdev, EV_KEY);
 	evdev_support_event(sc->mtl_evdev, EV_ABS);
-	evdev_support_abs(sc->mtl_evdev, ABS_MT_POSITION_X);
-	evdev_support_abs(sc->mtl_evdev, ABS_MT_POSITION_Y);
 
 	/* Support gestures as a keys */
 	evdev_support_key(sc->mtl_evdev, BTN_TOUCH);
@@ -110,14 +110,16 @@ terasic_mtl_touch_attach(struct terasic_mtl_softc *sc)
 	/* Set X axis bounds */
 	absinfo.minimum = 0;
 	absinfo.maximum = 1024;
-	evdev_set_absinfo(sc->mtl_evdev, ABS_MT_POSITION_X, &absinfo);
+	evdev_support_abs(sc->mtl_evdev, ABS_X, &absinfo);
+	evdev_support_abs(sc->mtl_evdev, ABS_MT_POSITION_X, &absinfo);
 
 	/* Set Y axis bounds */
 	absinfo.minimum = 0;
 	absinfo.maximum = 512;
-	evdev_set_absinfo(sc->mtl_evdev, ABS_MT_POSITION_Y, &absinfo);
+	evdev_support_abs(sc->mtl_evdev, ABS_Y, &absinfo);
+	evdev_support_abs(sc->mtl_evdev, ABS_MT_POSITION_Y, &absinfo);
 
-	evdev_register(sc->mtl_dev, sc->mtl_evdev);
+	evdev_register(sc->mtl_evdev);
 
 	callout_init(&sc->mtl_evdev_callout, 1);
 	return (0);
@@ -127,7 +129,7 @@ void
 terasic_mtl_touch_detach(struct terasic_mtl_softc *sc)
 {
 
-	evdev_unregister(sc->mtl_dev, sc->mtl_evdev);
+	evdev_unregister(sc->mtl_evdev);
 	evdev_free(sc->mtl_evdev);
 }
 

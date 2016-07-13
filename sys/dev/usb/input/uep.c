@@ -382,7 +382,10 @@ uep_attach(device_t dev)
 #ifdef EVDEV
 	sc->evdev = evdev_alloc();
 	evdev_set_name(sc->evdev, device_get_desc(dev));
-	evdev_set_serial(sc->evdev, "0");
+	evdev_set_phys(sc->evdev, device_get_nameunit(dev));
+	evdev_set_id(sc->evdev, BUS_USB, uaa->info.idVendor,
+	    uaa->info.idProduct, 0);
+	evdev_set_serial(sc->evdev, usb_get_serial(uaa->device));
 	evdev_set_methods(sc->evdev, sc, &uep_evdev_methods);
 	evdev_support_prop(sc->evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->evdev, EV_SYN);
@@ -397,7 +400,7 @@ uep_attach(device_t dev)
 	absinfo.maximum = UEP_MAX_Y;
 	evdev_support_abs(sc->evdev, ABS_Y, &absinfo);
 
-	evdev_register(dev, sc->evdev);
+	evdev_register(sc->evdev);
 #endif
 
 	sc->buf_len = 0;
@@ -416,6 +419,11 @@ uep_detach(device_t dev)
 	struct uep_softc *sc = device_get_softc(dev);
 
 	usb_fifo_detach(&sc->fifo);
+
+#ifdef EVDEV
+	evdev_unregister(sc->evdev);
+	evdev_free(sc->evdev);
+#endif
 
 	usbd_transfer_unsetup(sc->xfer, UEP_N_TRANSFER);
 

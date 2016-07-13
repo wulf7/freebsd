@@ -335,7 +335,10 @@ wmt_attach(device_t dev)
 	sc->evdev = evdev_alloc();
 
 	evdev_set_name(sc->evdev, device_get_desc(dev));
-	evdev_set_serial(sc->evdev, "0");
+	evdev_set_phys(sc->evdev, device_get_nameunit(dev));
+	evdev_set_id(sc->evdev, BUS_USB, uaa->info.idVendor,
+	    uaa->info.idProduct, 0);
+	evdev_set_serial(sc->evdev, usb_get_serial(uaa->device));
 	evdev_set_methods(sc->evdev, sc, &wmt_evdev_methods);
 	evdev_support_prop(sc->evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->evdev, EV_SYN);
@@ -348,7 +351,7 @@ wmt_attach(device_t dev)
 			evdev_support_abs(sc->evdev, wmt_hid_map[i].code,
 			    (struct input_absinfo *)&sc->ai[i]);
 
-	err = evdev_register(dev, sc->evdev);
+	err = evdev_register(sc->evdev);
 	if (err)
 		goto detach;
 
@@ -370,7 +373,7 @@ wmt_detach(device_t dev)
 	/* Stop intr transfer if running */
 	wmt_ev_close(sc->evdev, sc);
 
-	evdev_unregister(dev, sc->evdev);
+	evdev_unregister(sc->evdev);
 	evdev_free(sc->evdev);
 #ifdef WMT_FIFO_ENABLE
 	usb_fifo_detach(&sc->fifo);

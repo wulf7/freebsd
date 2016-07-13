@@ -476,11 +476,16 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		atkbd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
 
 #ifdef EVDEV
+#define	PS2_KEYBOARD_VENDOR	1
+#define	PS2_KEYBOARD_PRODUCT	1
+
 		/* register as evdev provider on first init */
 		if (dev != NULL && state->ks_evdev == NULL) {
 			evdev = evdev_alloc();
 			evdev_set_name(evdev, device_get_desc(dev));
-			evdev_set_serial(evdev, "0");
+			evdev_set_phys(evdev, device_get_nameunit(dev));
+			evdev_set_id(evdev, BUS_I8042, PS2_KEYBOARD_VENDOR,
+			    PS2_KEYBOARD_PRODUCT, 0);
 			evdev_set_methods(evdev, kbd, &atkbd_evdev_methods);
 			evdev_support_event(evdev, EV_SYN);
 			evdev_support_event(evdev, EV_KEY);
@@ -491,7 +496,7 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 			evdev_support_led(evdev, LED_CAPSL);
 			evdev_support_led(evdev, LED_SCROLLL);
 
-			evdev_register(dev, evdev);
+			evdev_register(evdev);
 			state->ks_evdev = evdev;
 			state->ks_evdev_state = 0;
 		}

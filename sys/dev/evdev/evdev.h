@@ -73,11 +73,6 @@ extern int evdev_rcpt_mask;
 #define	EVDEV_FLAG_MAX		0x1F
 #define	EVDEV_FLAG_CNT		(EVDEV_FLAG_MAX + 1)
 
-#define	PS2_KEYBOARD_VENDOR		1
-#define	PS2_KEYBOARD_PRODUCT		1
-#define	PS2_MOUSE_VENDOR		2
-#define	PS2_MOUSE_GENERIC_PRODUCT	1
-
 struct evdev_methods
 {
 	evdev_open_t		*ev_open;
@@ -91,12 +86,12 @@ struct evdev_methods
 struct evdev_dev *evdev_alloc(void);
 void evdev_free(struct evdev_dev *);
 void evdev_set_name(struct evdev_dev *, const char *);
-void evdev_set_id(struct evdev_dev *, const struct input_id *);
+void evdev_set_id(struct evdev_dev *, uint16_t, uint16_t, uint16_t, uint16_t);
 void evdev_set_phys(struct evdev_dev *, const char *);
 void evdev_set_serial(struct evdev_dev *, const char *);
 void evdev_set_methods(struct evdev_dev *, void *, struct evdev_methods *);
-int evdev_register(device_t, struct evdev_dev *);
-int evdev_unregister(device_t, struct evdev_dev *);
+int evdev_register(struct evdev_dev *);
+int evdev_unregister(struct evdev_dev *);
 int evdev_push_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 int evdev_sync(struct evdev_dev *);
 int evdev_mt_sync(struct evdev_dev *);

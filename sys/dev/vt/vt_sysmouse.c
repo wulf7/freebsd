@@ -98,8 +98,8 @@ sysmouse_evdev_init(void)
 
 	sysmouse_evdev = evdev_alloc();
 	evdev_set_name(sysmouse_evdev, "System mouse");
-	evdev_set_serial(sysmouse_evdev, "0");
 	evdev_set_phys(sysmouse_evdev, "sysmouse");
+	evdev_set_id(sysmouse_evdev, BUS_VIRTUAL, 0, 0, 0);
 	evdev_support_prop(sysmouse_evdev, INPUT_PROP_POINTER);
 	evdev_support_event(sysmouse_evdev, EV_SYN);
 	evdev_support_event(sysmouse_evdev, EV_REL);
@@ -110,7 +110,7 @@ sysmouse_evdev_init(void)
 	evdev_support_rel(sysmouse_evdev, REL_HWHEEL);
 	for (i = 0; i < 8; i++)
 		evdev_support_key(sysmouse_evdev, BTN_MOUSE + i);
-	if (evdev_register(NULL, sysmouse_evdev)) {
+	if (evdev_register(sysmouse_evdev)) {
 		evdev_free(sysmouse_evdev);
 		sysmouse_evdev = NULL;
 	}

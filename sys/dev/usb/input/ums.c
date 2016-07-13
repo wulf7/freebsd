@@ -692,7 +692,10 @@ ums_attach(device_t dev)
 #ifdef EVDEV
 	sc->sc_evdev = evdev_alloc();
 	evdev_set_name(sc->sc_evdev, device_get_desc(dev));
-	evdev_set_serial(sc->sc_evdev, "0");
+	evdev_set_phys(sc->sc_evdev, device_get_nameunit(dev));
+	evdev_set_id(sc->sc_evdev, BUS_USB, uaa->info.idVendor,
+	    uaa->info.idProduct, 0);
+	evdev_set_serial(sc->sc_evdev, usb_get_serial(uaa->device));
 	evdev_set_methods(sc->sc_evdev, sc, &ums_evdev_methods);
 	evdev_support_prop(sc->sc_evdev, INPUT_PROP_POINTER);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
@@ -716,7 +719,7 @@ ums_attach(device_t dev)
 	for (i = 0; i < info->sc_buttons; i++)
 		evdev_support_key(sc->sc_evdev, BTN_MOUSE + i);
 
-	err = evdev_register(dev, sc->sc_evdev);
+	err = evdev_register(sc->sc_evdev);
 	if (err)
 		goto detach;
 #endif
@@ -747,7 +750,7 @@ ums_detach(device_t self)
 	usb_fifo_detach(&sc->sc_fifo);
 
 #ifdef EVDEV
-	evdev_unregister(self, sc->sc_evdev);
+	evdev_unregister(sc->sc_evdev);
 	evdev_free(sc->sc_evdev);
 #endif
 

@@ -1528,9 +1528,14 @@ psmattach(device_t dev)
 	sc->bdev->si_drv1 = sc;
 
 #ifdef EVDEV
+#define	PS2_MOUSE_VENDOR		2
+#define	PS2_MOUSE_GENERIC_PRODUCT	1
+
 	sc->evdev = evdev_alloc();
 	evdev_set_name(sc->evdev, model_name(sc->hw.model));
-	evdev_set_serial(sc->evdev, "0");
+	evdev_set_phys(sc->evdev, device_get_nameunit(dev));
+	evdev_set_id(sc->evdev, BUS_I8042, PS2_MOUSE_VENDOR,
+	    PS2_MOUSE_GENERIC_PRODUCT, 0);
 	evdev_set_methods(sc->evdev, sc, &psm_ev_methods);
 	evdev_support_prop(sc->evdev, INPUT_PROP_POINTER);
 	evdev_support_event(sc->evdev, EV_SYN);
@@ -1557,7 +1562,7 @@ psmattach(device_t dev)
 	for (i = 0; i < sc->hw.buttons; i++)
 		evdev_support_key(sc->evdev, BTN_MOUSE + i);
 
-	error = evdev_register(dev, sc->evdev);
+	error = evdev_register(sc->evdev);
 	if (error)
 		return (error);
 #endif

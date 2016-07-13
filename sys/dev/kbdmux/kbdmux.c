@@ -516,7 +516,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_set_name(evdev, "System keyboard multiplexer");
 		snprintf(phys_loc, NAMELEN, KEYBOARD_NAME"%d", unit);
 		evdev_set_phys(evdev, phys_loc);
-		evdev_set_serial(evdev, "0");
+		evdev_set_id(evdev, BUS_VIRTUAL, 0, 0, 0);
 		evdev_set_methods(evdev, kbd, &kbdmux_evdev_methods);
 		evdev_support_event(evdev, EV_SYN);
 		evdev_support_event(evdev, EV_KEY);
@@ -527,7 +527,7 @@ kbdmux_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		evdev_support_led(evdev, LED_CAPSL);
 		evdev_support_led(evdev, LED_SCROLLL);
 
-		if (evdev_register(NULL, evdev))
+		if (evdev_register(evdev))
 			evdev_free(evdev);
 		else
 			state->ks_evdev = evdev;
@@ -601,6 +601,11 @@ kbdmux_term(keyboard_t *kbd)
 	KBDMUX_UNLOCK(state);
 
 	kbd_unregister(kbd);
+
+#ifdef EVDEV
+	evdev_unregister(state->ks_evdev);
+	evdev_free(state->ks_evdev);
+#endif
 
 	KBDMUX_LOCK_DESTROY(state);
 	bzero(state, sizeof(*state));

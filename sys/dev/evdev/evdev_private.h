@@ -76,7 +76,6 @@ struct evdev_dev
 	char			ev_name[NAMELEN];
 	char			ev_shortname[NAMELEN];
 	char			ev_serial[NAMELEN];
-	device_t		ev_dev;
 	struct cdev *		ev_cdev;
 	int			ev_unit;
 	struct mtx		ev_mtx;

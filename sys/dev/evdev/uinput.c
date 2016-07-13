@@ -186,7 +186,7 @@ uinput_dtor(void *data)
 	struct uinput_cdev_state *state = (struct uinput_cdev_state *)data;
 
 	if (state->ucs_state == UINPUT_RUNNING)
-		evdev_unregister(NULL, state->ucs_evdev);
+		evdev_unregister(state->ucs_evdev);
 
 	evdev_free(state->ucs_evdev);
 
@@ -300,7 +300,8 @@ uinput_setup_dev(struct uinput_cdev_state *state, struct input_id *id,
 		return (EINVAL);
 
 	evdev_set_name(state->ucs_evdev, name);
-	evdev_set_id(state->ucs_evdev, id);
+	evdev_set_id(state->ucs_evdev, id->bustype, id->vendor, id->product,
+	    id->version);
 	state->ucs_state = UINPUT_CONFIGURED;
 
 	return (0);
@@ -464,7 +465,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 		evdev_set_methods(state->ucs_evdev, state, &uinput_ev_methods);
 		evdev_set_flag(state->ucs_evdev, EVDEV_FLAG_SOFTREPEAT);
-		evdev_register(NULL, state->ucs_evdev);
+		evdev_register(state->ucs_evdev);
 		state->ucs_state = UINPUT_RUNNING;
 		return (0);
 
@@ -472,7 +473,7 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		if (state->ucs_state != UINPUT_RUNNING)
 			return (0);
 
-		evdev_unregister(NULL, state->ucs_evdev);
+		evdev_unregister(state->ucs_evdev);
 		state->ucs_state = UINPUT_NEW;
 		return (0);
 

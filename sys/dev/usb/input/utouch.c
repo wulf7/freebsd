@@ -199,7 +199,10 @@ utouch_attach(device_t dev)
 
 	sc->sc_evdev = evdev_alloc();
 	evdev_set_name(sc->sc_evdev, device_get_desc(dev));
-	evdev_set_serial(sc->sc_evdev, "0");
+	evdev_set_phys(sc->sc_evdev, device_get_nameunit(dev));
+	evdev_set_id(sc->sc_evdev, BUS_USB, uaa->info.idVendor,
+	    uaa->info.idProduct, 0);
+	evdev_set_serial(sc->sc_evdev, usb_get_serial(uaa->device));
 	evdev_set_methods(sc->sc_evdev, sc, &utouch_evdev_methods);
 	evdev_support_prop(sc->sc_evdev, INPUT_PROP_DIRECT);
 	evdev_support_event(sc->sc_evdev, EV_SYN);
@@ -221,7 +224,7 @@ utouch_attach(device_t dev)
 	if (sc->sc_flags & UTOUCH_FLAG_Y_AXIS)
 		evdev_support_abs(sc->sc_evdev, ABS_Y, &absinfo);
 
-	err = evdev_register(dev, sc->sc_evdev);
+	err = evdev_register(sc->sc_evdev);
 	if (err)
 		goto detach;
 
@@ -243,7 +246,7 @@ utouch_detach(device_t dev)
 	/* Stop intr transfer if running */
 	utouch_ev_close(sc->sc_evdev, sc);
 
-	evdev_unregister(dev, sc->sc_evdev);
+	evdev_unregister(sc->sc_evdev);
 	evdev_free(sc->sc_evdev);
 	usbd_transfer_unsetup(sc->sc_xfer, UTOUCH_N_TRANSFER);
 	mtx_destroy(&sc->sc_mtx);

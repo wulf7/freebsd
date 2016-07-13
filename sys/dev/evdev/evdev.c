@@ -30,17 +30,11 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
-#include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/malloc.h>
 #include <sys/bitstring.h>
 #include <sys/sysctl.h>
-
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcivar.h>
-#include <dev/usb/usb.h>
-#include <dev/usb/usbdi.h>
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/evdev.h>
@@ -72,7 +66,6 @@ SYSCTL_INT(_kern_evdev, OID_AUTO, rcpt_mask, CTLFLAG_RW, &evdev_rcpt_mask, 0,
     "Who is receiving events: bit0 - sysmouse, bit1 - kbdmux, "
     "bit2 - mouse hardware, bit3 - keyboard hardware");
 
-static void evdev_assign_id(struct evdev_dev *);
 static void evdev_start_repeat(struct evdev_dev *, uint16_t);
 static void evdev_stop_repeat(struct evdev_dev *);
 static int evdev_check_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
@@ -188,20 +181,16 @@ evdev_estimate_report_size(struct evdev_dev *evdev)
 }
 
 int
-evdev_register(device_t dev, struct evdev_dev *evdev)
+evdev_register(struct evdev_dev *evdev)
 {
 	int ret;
 
-	device_printf(dev, "registered evdev provider: %s <%s>\n",
-	    evdev->ev_name, evdev->ev_serial);
+	debugf("%s: registered evdev provider: %s <%s>\n",
+	    evdev->ev_shortname, evdev->ev_name, evdev->ev_serial);
 
 	/* Initialize internal structures */
-	evdev->ev_dev = dev;
 	mtx_init(&evdev->ev_mtx, "evmtx", NULL, MTX_DEF);
 	LIST_INIT(&evdev->ev_clients);
-
-	if (dev != NULL)
-		strlcpy(evdev->ev_shortname, device_get_nameunit(dev), NAMELEN);
 
 	if (evdev_event_supported(evdev, EV_REP) &&
 	    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
@@ -215,9 +204,6 @@ evdev_register(device_t dev, struct evdev_dev *evdev)
 			evdev->ev_rep[REP_PERIOD] = 33;
 		}
 	}
-
-	/* Retrieve bus info */
-	evdev_assign_id(evdev);
 
 	/* Initialize multitouch protocol type B states */
 	if (bit_test(evdev->ev_abs_flags, ABS_MT_SLOT) &&
@@ -242,11 +228,12 @@ bail_out:
 }
 
 int
-evdev_unregister(device_t dev, struct evdev_dev *evdev)
+evdev_unregister(struct evdev_dev *evdev)
 {
 	struct evdev_client *client;
 	int ret;
-	device_printf(dev, "unregistered evdev provider: %s\n", evdev->ev_name);
+	debugf("%s: unregistered evdev provider: %s\n", evdev->ev_shortname,
+	    evdev->ev_name);
 
 	EVDEV_LOCK(evdev);
 	evdev->ev_cdev->si_drv1 = NULL;
@@ -279,10 +266,16 @@ evdev_set_name(struct evdev_dev *evdev, const char *name)
 }
 
 inline void
-evdev_set_id(struct evdev_dev *evdev, const struct input_id *id)
+evdev_set_id(struct evdev_dev *evdev, uint16_t bustype, uint16_t vendor,
+    uint16_t product, uint16_t version)
 {
 
-	memcpy(&evdev->ev_id, id, sizeof(struct input_id));
+	evdev->ev_id = (struct input_id) {
+		.bustype = bustype,
+		.vendor = vendor,
+		.product = product,
+		.version = version
+	};
 }
 
 inline void
@@ -861,65 +854,6 @@ evdev_release_client(struct evdev_dev *evdev, struct evdev_client *client)
 	evdev->ev_grabber = NULL;
 
 	return (0);
-}
-
-static void
-evdev_assign_id(struct evdev_dev *dev)
-{
-	device_t parent;
-	devclass_t devclass;
-	const char *classname;
-
-	if (dev->ev_id.bustype != 0)
-		return;
-
-	if (dev->ev_dev == NULL) {
-		dev->ev_id.bustype = BUS_VIRTUAL;
-		return;
-	}
-
-	parent = device_get_parent(dev->ev_dev);
-	if (parent == NULL) {
-		dev->ev_id.bustype = BUS_HOST;
-		return;
-	}
-
-	devclass = device_get_devclass(parent);
-	classname = devclass_get_name(devclass);
-
-	debugf("parent bus classname: %s", classname);
-
-	if (strcmp(classname, "pci") == 0) {
-		dev->ev_id.bustype = BUS_PCI;
-		dev->ev_id.vendor = pci_get_vendor(dev->ev_dev);
-		dev->ev_id.product = pci_get_device(dev->ev_dev);
-		dev->ev_id.version = pci_get_revid(dev->ev_dev);
-		return;
-	}
-
-	if (strcmp(classname, "uhub") == 0) {
-		struct usb_attach_arg *uaa = device_get_ivars(dev->ev_dev);
-		dev->ev_id.bustype = BUS_USB;
-		dev->ev_id.vendor = uaa->info.idVendor;
-		dev->ev_id.product = uaa->info.idProduct;
-		return;
-	}
-
-	if (strcmp(classname, "atkbdc") == 0) {
-		devclass = device_get_devclass(dev->ev_dev);
-		classname = devclass_get_name(devclass);
-		dev->ev_id.bustype = BUS_I8042;
-		if (strcmp(classname, "atkbd") == 0) {
-			dev->ev_id.vendor = PS2_KEYBOARD_VENDOR;
-			dev->ev_id.product = PS2_KEYBOARD_PRODUCT;
-		} else if (strcmp(classname, "psm") == 0) {
-			dev->ev_id.vendor = PS2_MOUSE_VENDOR;
-			dev->ev_id.product = PS2_MOUSE_GENERIC_PRODUCT;
-		}
-		return;
-	}
-
-	dev->ev_id.bustype = BUS_HOST;
 }
 
 static void
