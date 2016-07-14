@@ -185,9 +185,6 @@ uinput_dtor(void *data)
 {
 	struct uinput_cdev_state *state = (struct uinput_cdev_state *)data;
 
-	if (state->ucs_state == UINPUT_RUNNING)
-		evdev_unregister(state->ucs_evdev);
-
 	evdev_free(state->ucs_evdev);
 
 	knlist_clear(&state->ucs_selp.si_note, 0);

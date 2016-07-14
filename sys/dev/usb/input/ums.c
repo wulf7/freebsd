@@ -750,7 +750,6 @@ ums_detach(device_t self)
 	usb_fifo_detach(&sc->sc_fifo);
 
 #ifdef EVDEV
-	evdev_unregister(sc->sc_evdev);
 	evdev_free(sc->sc_evdev);
 #endif
 

@@ -373,7 +373,6 @@ wmt_detach(device_t dev)
 	/* Stop intr transfer if running */
 	wmt_ev_close(sc->evdev, sc);
 
-	evdev_unregister(sc->evdev);
 	evdev_free(sc->evdev);
 #ifdef WMT_FIFO_ENABLE
 	usb_fifo_detach(&sc->fifo);

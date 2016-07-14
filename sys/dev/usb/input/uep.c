@@ -421,7 +421,6 @@ uep_detach(device_t dev)
 	usb_fifo_detach(&sc->fifo);
 
 #ifdef EVDEV
-	evdev_unregister(sc->evdev);
 	evdev_free(sc->evdev);
 #endif
 

@@ -90,6 +90,9 @@ void
 evdev_free(struct evdev_dev *evdev)
 {
 
+	if (evdev->ev_cdev != NULL && evdev->ev_cdev->si_drv1 != NULL)
+		evdev_unregister(evdev);
+
 	free(evdev, M_EVDEV);
 }
 
@@ -249,6 +252,7 @@ evdev_unregister(struct evdev_dev *evdev)
 
 	/* destroy_dev can sleep so release lock */
 	ret = evdev_cdev_destroy(evdev);
+	evdev->ev_cdev = NULL;
 	if (ret == 0)
 		mtx_destroy(&evdev->ev_mtx);
 

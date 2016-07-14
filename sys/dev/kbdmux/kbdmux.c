@@ -603,7 +603,6 @@ kbdmux_term(keyboard_t *kbd)
 	kbd_unregister(kbd);
 
 #ifdef EVDEV
-	evdev_unregister(state->ks_evdev);
 	evdev_free(state->ks_evdev);
 #endif
 
