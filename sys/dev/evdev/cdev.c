@@ -110,25 +110,24 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	client->ec_buffer_ready = 0;
 
 	client->ec_evdev = evdev;
+	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
+	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
+
 	/* Avoid race with evdev_unregister */
 	EVDEV_LOCK(evdev);
 	if (dev->si_drv1 == NULL)
 		ret = ENODEV;
 	else
 		ret = evdev_register_client(evdev, client);
+	if (ret != 0)
+		evdev_revoke_client(client);
+	else
+		ret = devfs_set_cdevpriv(client, evdev_dtor);
 	EVDEV_UNLOCK(evdev);
 	if (ret != 0) {
 		debugf("cdev: cannot register evdev client");
-		free(client, M_EVDEV);
-		return (ret);
-	}
-
-	mtx_init(&client->ec_buffer_mtx, "evclient", "evdev", MTX_DEF);
-	knlist_init_mtx(&client->ec_selp.si_note, &client->ec_buffer_mtx);
-
-	ret = devfs_set_cdevpriv(client, evdev_dtor);
-	if (ret != 0)
 		evdev_dtor(client);
+	}
 
 	return (ret);
 }
