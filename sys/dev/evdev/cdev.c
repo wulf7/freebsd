@@ -251,7 +251,7 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 		return (POLLNVAL);
 
 	if (client->ec_revoked)
-		return (POLLNVAL);
+		return (POLLHUP);
 
 	if (events & (POLLIN | POLLRDNORM)) {
 		EVDEV_CLIENT_LOCKQ(client);
