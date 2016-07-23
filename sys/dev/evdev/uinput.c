@@ -38,6 +38,8 @@
 #include <sys/poll.h>
 #include <sys/selinfo.h>
 #include <sys/malloc.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
 
 #include <dev/evdev/input.h>
 #include <dev/evdev/uinput.h>
@@ -53,9 +55,9 @@
 
 #define	UINPUT_BUFFER_SIZE	16
 
-#define	UINPUT_LOCKQ(state)		mtx_lock(&(state)->ucs_mtx)
-#define	UINPUT_UNLOCKQ(state)		mtx_unlock(&(state)->ucs_mtx)
-#define	UINPUT_LOCKQ_ASSERT(state)	mtx_assert(&(state)->ucs_mtx, MA_OWNED)
+#define	UINPUT_LOCK(state)		sx_xlock(&(state)->ucs_lock)
+#define	UINPUT_UNLOCK(state)		sx_unlock(&(state)->ucs_lock)
+#define	UINPUT_LOCK_ASSERT(state)	sx_assert(&(state)->ucs_lock, SA_LOCKED)
 #define UINPUT_EMPTYQ(state) \
     ((state)->ucs_buffer_head == (state)->ucs_buffer_tail)
 
@@ -107,7 +109,7 @@ struct uinput_cdev_state
 {
 	enum uinput_state	ucs_state;
 	struct evdev_dev *	ucs_evdev;
-	struct mtx		ucs_mtx;
+	struct sx		ucs_lock;
 	size_t			ucs_buffer_head;
 	size_t			ucs_buffer_tail;
 	struct selinfo		ucs_selp;
@@ -124,6 +126,38 @@ static int uinput_cdev_create(void);
 static void uinput_notify(struct uinput_cdev_state *);
 
 static void
+uinput_knllock(void *arg)
+{
+	struct sx *sx = arg;
+
+	sx_xlock(sx);
+}
+
+static void
+uinput_knlunlock(void *arg)
+{
+	struct sx *sx = arg;
+
+	sx_unlock(sx);
+}
+
+static void
+uinput_knl_assert_locked(void *arg)
+{
+	struct sx *sx = arg;
+
+	sx_assert(sx, SA_XLOCKED);
+}
+
+static void
+uinput_knl_assert_unlocked(void *arg)
+{
+	struct sx *sx = arg;
+
+	sx_assert(sx, SA_UNLOCKED);
+}
+
+static void
 uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
     uint16_t code, int32_t value)
 {
@@ -132,10 +166,12 @@ uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
 	if (type == EV_LED)
 		evdev_push_event(evdev, type, code, value);
 
-	UINPUT_LOCKQ(state);
-	uinput_enqueue_event(state, type, code, value);
-	uinput_notify(state);
-	UINPUT_UNLOCKQ(state);
+	UINPUT_LOCK(state);
+	if (state->ucs_state == UINPUT_RUNNING) {
+		uinput_enqueue_event(state, type, code, value);
+		uinput_notify(state);
+	}
+	UINPUT_UNLOCK(state);
 }
 
 static void
@@ -144,7 +180,7 @@ uinput_enqueue_event(struct uinput_cdev_state *state, uint16_t type,
 {
 	size_t head, tail;
 
-	UINPUT_LOCKQ_ASSERT(state);
+	UINPUT_LOCK_ASSERT(state);
 
 	head = state->ucs_buffer_head;
 	tail = (state->ucs_buffer_tail + 1) % UINPUT_BUFFER_SIZE;
@@ -173,8 +209,10 @@ uinput_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	    M_WAITOK | M_ZERO);
 	state->ucs_evdev = evdev_alloc();
 
-	mtx_init(&state->ucs_mtx, "uinput", NULL, MTX_DEF);
-	knlist_init_mtx(&state->ucs_selp.si_note, &state->ucs_mtx);
+	sx_init(&state->ucs_lock, "uinput");
+	knlist_init(&state->ucs_selp.si_note, &state->ucs_lock, uinput_knllock,
+	    uinput_knlunlock, uinput_knl_assert_locked,
+	    uinput_knl_assert_unlocked);
 
 	devfs_set_cdevpriv(state, uinput_dtor);
 	return (0);
@@ -190,7 +228,7 @@ uinput_dtor(void *data)
 	knlist_clear(&state->ucs_selp.si_note, 0);
 	seldrain(&state->ucs_selp);
 	knlist_destroy(&state->ucs_selp.si_note);
-	mtx_destroy(&state->ucs_mtx);
+	sx_destroy(&state->ucs_lock);
 	free(data, M_EVDEV);
 }
 
@@ -214,15 +252,18 @@ uinput_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 	remaining = uio->uio_resid / sizeof(struct input_event);
 
-	UINPUT_LOCKQ(state);
+	UINPUT_LOCK(state);
 
-	if (UINPUT_EMPTYQ(state)) {
+	if (state->ucs_state != UINPUT_RUNNING)
+		ret = EINVAL;
+
+	if (ret == 0 && UINPUT_EMPTYQ(state)) {
 		if (ioflag & O_NONBLOCK)
 			ret = EWOULDBLOCK;
 		else {
 			if (remaining != 0) {
 				state->ucs_blocked = true;
-				ret = mtx_sleep(state, &state->ucs_mtx,
+				ret = sx_sleep(state, &state->ucs_lock,
 				    PCATCH, "uiread", 0);
 			}
 		}
@@ -233,13 +274,10 @@ uinput_read(struct cdev *dev, struct uio *uio, int ioflag)
 		state->ucs_buffer_head = (state->ucs_buffer_head + 1) %
 		    UINPUT_BUFFER_SIZE;
 		remaining--;
-
-		UINPUT_UNLOCKQ(state);
 		ret = uiomove(event, sizeof(struct input_event), uio);
-		UINPUT_LOCKQ(state);
 	}
 
-	UINPUT_UNLOCKQ(state);
+	UINPUT_UNLOCK(state);
 
 	return (ret);
 }
@@ -259,33 +297,36 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 	if (ret != 0)
 		return (ret);
 
+	UINPUT_LOCK(state);
+
 	if (state->ucs_state != UINPUT_RUNNING) {
 		/* Process written struct uinput_user_dev */
 		if (uio->uio_resid != sizeof(struct uinput_user_dev)) {
 			debugf("write size not multiple of struct uinput_user_dev size");
-			return (EINVAL);
+			ret = EINVAL;
+		} else {
+			ret = uiomove(&userdev, sizeof(struct uinput_user_dev),
+			    uio);
+			if (ret == 0)
+				uinput_setup_provider(state, &userdev);
 		}
-
-		uiomove(&userdev, sizeof(struct uinput_user_dev), uio);
-		uinput_setup_provider(state, &userdev);
 	} else {
 		/* Process written event */
 		if (uio->uio_resid % sizeof(struct input_event) != 0) {
 			debugf("write size not multiple of struct input_event size");
-			return (EINVAL);
+			ret = EINVAL;
 		}
 
-		while (uio->uio_resid > 0) {
+		while (ret == 0 && uio->uio_resid > 0) {
 			uiomove(&event, sizeof(struct input_event), uio);
-			ret = evdev_inject_event(state->ucs_evdev, event.type,
+			ret = evdev_push_event(state->ucs_evdev, event.type,
 			    event.code, event.value);
-
-			if (ret != 0)
-				return (ret);
 		}
 	}
 
-	return (0);
+	UINPUT_UNLOCK(state);
+
+	return (ret);
 }
 
 static int
@@ -349,14 +390,14 @@ uinput_poll(struct cdev *dev, int events, struct thread *td)
 		revents |= (events & (POLLOUT | POLLWRNORM));
 
 	if (events & (POLLIN | POLLRDNORM)) {
-		UINPUT_LOCKQ(state);
+		UINPUT_LOCK(state);
 		if (!UINPUT_EMPTYQ(state))
 			revents = events & (POLLIN | POLLRDNORM);
 		else {
 			state->ucs_selected = true;
 			selrecord(td, &state->ucs_selp);
 		}
-		UINPUT_UNLOCKQ(state);
+		UINPUT_UNLOCK(state);
 	}
 
 	return (revents);
@@ -393,7 +434,7 @@ uinput_kqread(struct knote *kn, long hint)
 
 	state = (struct uinput_cdev_state *)kn->kn_hook;
 
-	UINPUT_LOCKQ_ASSERT(state);
+	UINPUT_LOCK_ASSERT(state);
 
 	ret = !UINPUT_EMPTYQ(state);
 	return (ret);
@@ -412,7 +453,7 @@ static void
 uinput_notify(struct uinput_cdev_state *state)
 {
 
-	UINPUT_LOCKQ_ASSERT(state);
+	UINPUT_LOCK_ASSERT(state);
 
 	if (state->ucs_blocked) {
 		state->ucs_blocked = false;
@@ -426,24 +467,18 @@ uinput_notify(struct uinput_cdev_state *state)
 }
 
 static int
-uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
-    struct thread *td)
+uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 {
-	struct uinput_cdev_state *state;
 	struct uinput_setup *us;
 	struct uinput_abs_setup *uabs;
 	int ret, len, intdata;
 	char buf[NAMELEN];
 
+	UINPUT_LOCK_ASSERT(state);
+
 	len = IOCPARM_LEN(cmd);
 	if ((cmd & IOC_DIRMASK) == IOC_VOID && len == sizeof(int))
 		intdata = *(int *)data;
-
-	debugf("uinput: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
-
-	ret = devfs_get_cdevpriv((void **)&state);
-	if (ret != 0)
-		return (ret);
 
 	switch (IOCBASECMD(cmd)) {
 	case UI_GET_SYSNAME(0):
@@ -591,6 +626,26 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	}
 
 	return (EINVAL);
+}
+
+static int
+uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
+    struct thread *td)
+{
+	struct uinput_cdev_state *state;
+	int ret;
+
+	debugf("uinput: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
+
+	ret = devfs_get_cdevpriv((void **)&state);
+	if (ret != 0)
+		return (ret);
+
+	UINPUT_LOCK(state);
+	ret = uinput_ioctl_sub(state, cmd, data);
+	UINPUT_UNLOCK(state);
+
+	return (ret);
 }
 
 static int
