@@ -23,4 +23,5 @@ include		GENERIC
 
 ident		EVDEV
 
-options		EVDEV
+options		EVDEV			# input event device support
+#options 	EVDEV_DEBUG		# enable event debug msgs

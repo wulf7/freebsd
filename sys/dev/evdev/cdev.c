@@ -27,6 +27,8 @@
  * $FreeBSD$
  */
 
+#include "opt_evdev.h"
+
 #include <sys/types.h>
 #include <sys/bitstring.h>
 #include <sys/systm.h>
@@ -46,11 +48,10 @@
 #include <dev/evdev/evdev.h>
 #include <dev/evdev/evdev_private.h>
 
-#undef	DEBUG
-#ifdef DEBUG
-#define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args);
+#ifdef EVDEV_DEBUG
+#define	debugf(client, fmt, args...)	printf("evdev cdev: "fmt"\n", ##args);
 #else
-#define	debugf(fmt, args...)
+#define	debugf(client, fmt, args...)
 #endif
 
 #define	DEF_RING_REPORTS	8
@@ -125,7 +126,7 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 		ret = devfs_set_cdevpriv(client, evdev_dtor);
 	EVDEV_UNLOCK(evdev);
 	if (ret != 0) {
-		debugf("cdev: cannot register evdev client");
+		debugf(client, "cannot register evdev client");
 		evdev_dtor(client);
 	}
 
@@ -158,12 +159,12 @@ evdev_read(struct cdev *dev, struct uio *uio, int ioflag)
 	int ret = 0;
 	int remaining;
 
-	debugf("cdev: read %zd bytes by thread %d", uio->uio_resid,
-	    uio->uio_td->td_tid);
-
 	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
+
+	debugf(client, "read %zd bytes by thread %d", uio->uio_resid,
+	    uio->uio_td->td_tid);
 
 	if (client->ec_revoked)
 		return (ENODEV);
@@ -212,18 +213,18 @@ evdev_write(struct cdev *dev, struct uio *uio, int ioflag)
 	struct input_event event;
 	int ret = 0;
 
-	debugf("cdev: write %zd bytes by thread %d", uio->uio_resid,
-	    uio->uio_td->td_tid);
-
 	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (ret);
+
+	debugf(client, "write %zd bytes by thread %d", uio->uio_resid,
+	    uio->uio_td->td_tid);
 
 	if (client->ec_revoked || evdev == NULL)
 		return (ENODEV);
 
 	if (uio->uio_resid % sizeof(struct input_event) != 0) {
-		debugf("write size not multiple of struct input_event size");
+		debugf(client, "write size not multiple of input_event size");
 		return (EINVAL);
 	}
 
@@ -244,11 +245,11 @@ evdev_poll(struct cdev *dev, int events, struct thread *td)
 	int ret;
 	int revents = 0;
 
-	debugf("cdev: poll by thread %d", td->td_tid);
-
 	ret = devfs_get_cdevpriv((void **)&client);
 	if (ret != 0)
 		return (POLLNVAL);
+
+	debugf(client, "poll by thread %d", td->td_tid);
 
 	if (client->ec_revoked)
 		return (POLLHUP);
@@ -370,7 +371,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	}
 
 	len = IOCPARM_LEN(cmd);
-	debugf("cdev: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
+	debugf(client, "ioctl called: cmd=0x%08lx, data=%p", cmd, data);
 
 	/* evdev fixed-length ioctls handling */
 	switch (cmd) {
@@ -379,7 +380,7 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (0);
 
 	case EVIOCGID:
-		debugf("cdev: EVIOCGID: bus=%d vendor=0x%04x product=0x%04x",
+		debugf(client, "EVIOCGID: bus=%d vendor=0x%04x product=0x%04x",
 		    evdev->ev_id.bustype, evdev->ev_id.vendor,
 		    evdev->ev_id.product);
 		memcpy(data, &evdev->ev_id, sizeof(struct input_id));
@@ -564,7 +565,8 @@ evdev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
 	case EVIOCGBIT(0, 0) ... EVIOCGBIT(EV_MAX, 0):
 		type_num = IOCBASECMD(cmd) - EVIOCGBIT(0, 0);
-		debugf("cdev: EVIOCGBIT(%d): data=%p, len=%d", type_num, data, len);
+		debugf(client, "EVIOCGBIT(%d): data=%p, len=%d", type_num,
+		    data, len);
 		return (evdev_ioctl_eviocgbit(evdev, type_num, len, data));
 	}
 
@@ -731,7 +733,7 @@ evdev_client_push(struct evdev_client *client, uint16_t type, uint16_t code,
 
 	/* If queue is full drop its content and place SYN_DROPPED event */
 	if ((tail + 1) % count == head) {
-		debugf("client %p: buffer overflow", client);
+		debugf(client, "client %p: buffer overflow", client);
 
 		head = (tail + count - 1) % count;
 		client->ec_buffer[head] = (struct input_event) {

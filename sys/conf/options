@@ -988,3 +988,4 @@ GPIO_SPI_DEBUG	opt_gpio.h
 
 # evdev protocol support
 EVDEV		opt_evdev.h
+EVDEV_DEBUG	opt_evdev.h

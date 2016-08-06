@@ -27,6 +27,8 @@
  * $FreeBSD$
  */
 
+#include "opt_evdev.h"
+
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -40,10 +42,10 @@
 #include <dev/evdev/evdev.h>
 #include <dev/evdev/evdev_private.h>
 
-#ifdef DEBUG
-#define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args)
+#ifdef EVDEV_DEBUG
+#define	debugf(evdev, fmt, args...)	printf("evdev: " fmt "\n", ##args)
 #else
-#define	debugf(fmt, args...)
+#define	debugf(evdev, fmt, args...)
 #endif
 
 #ifdef FEATURE
@@ -188,7 +190,7 @@ evdev_register(struct evdev_dev *evdev)
 {
 	int ret;
 
-	debugf("%s: registered evdev provider: %s <%s>\n",
+	debugf(evdev, "%s: registered evdev provider: %s <%s>\n",
 	    evdev->ev_shortname, evdev->ev_name, evdev->ev_serial);
 
 	/* Initialize internal structures */
@@ -235,8 +237,8 @@ evdev_unregister(struct evdev_dev *evdev)
 {
 	struct evdev_client *client;
 	int ret;
-	debugf("%s: unregistered evdev provider: %s\n", evdev->ev_shortname,
-	    evdev->ev_name);
+	debugf(evdev, "%s: unregistered evdev provider: %s\n",
+	    evdev->ev_shortname, evdev->ev_name);
 
 	EVDEV_LOCK(evdev);
 	evdev->ev_cdev->si_drv1 = NULL;
@@ -669,7 +671,7 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 {
 	struct evdev_client *client;
 
-	debugf("%s pushed event %d/%d/%d",
+	debugf(evdev, "%s pushed event %d/%d/%d",
 	    evdev->ev_shortname, type, code, value);
 
 	EVDEV_LOCK_ASSERT(evdev);
@@ -799,13 +801,14 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
 	int ret = 0;
 
-	debugf("adding new client for device %s", evdev->ev_shortname);
+	debugf(evdev, "adding new client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK_ASSERT(evdev);
 
 	if (LIST_EMPTY(&evdev->ev_clients) && evdev->ev_methods != NULL &&
 	    evdev->ev_methods->ev_open != NULL) {
-		debugf("calling ev_open() on device %s", evdev->ev_shortname);
+		debugf(evdev, "calling ev_open() on device %s",
+		    evdev->ev_shortname);
 		ret = evdev->ev_methods->ev_open(evdev, evdev->ev_softc);
 	}
 	if (ret == 0)
@@ -816,7 +819,7 @@ evdev_register_client(struct evdev_dev *evdev, struct evdev_client *client)
 void
 evdev_dispose_client(struct evdev_dev *evdev, struct evdev_client *client)
 {
-	debugf("removing client for device %s", evdev->ev_shortname);
+	debugf(evdev, "removing client for device %s", evdev->ev_shortname);
 
 	EVDEV_LOCK_ASSERT(evdev);
 
