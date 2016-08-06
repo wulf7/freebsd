@@ -25,3 +25,5 @@ ident		EVDEV
 
 options		EVDEV			# input event device support
 #options 	EVDEV_DEBUG		# enable event debug msgs
+device		uinput			# /dev/uinput cdev
+#options 	UINPUT_DEBUG		# enable uinput debug msgs

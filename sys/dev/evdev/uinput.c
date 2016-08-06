@@ -27,6 +27,8 @@
  * $FreeBSD$
  */
 
+#include "opt_evdev.h"
+
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -46,11 +48,10 @@
 #include <dev/evdev/evdev.h>
 #include <dev/evdev/evdev_private.h>
 
-#undef	DEBUG
-#ifdef DEBUG
-#define	debugf(fmt, args...)	printf("evdev: " fmt "\n", ##args);
+#ifdef UINPUT_DEBUG
+#define	debugf(state, fmt, args...)	printf("uinput: " fmt "\n", ##args);
 #else
-#define	debugf(fmt, args...)
+#define	debugf(state, fmt, args...)
 #endif
 
 #define	UINPUT_BUFFER_SIZE	16
@@ -193,7 +194,7 @@ uinput_enqueue_event(struct uinput_cdev_state *state, uint16_t type,
 
 	/* If queue is full remove oldest event */
 	if (tail == head) {
-		debugf("state %p: buffer overflow", state);
+		debugf(state, "state %p: buffer overflow", state);
 
 		head = (head + 1) % UINPUT_BUFFER_SIZE;
 		state->ucs_buffer_head = head;
@@ -239,12 +240,12 @@ uinput_read(struct cdev *dev, struct uio *uio, int ioflag)
 	struct input_event *event;
 	int remaining, ret;
 
-	debugf("uinput: read %zd bytes by thread %d", uio->uio_resid,
-	    uio->uio_td->td_tid);
-
 	ret = devfs_get_cdevpriv((void **)&state);
 	if (ret != 0)
 		return (ret);
+
+	debugf(state, "read %zd bytes by thread %d", uio->uio_resid,
+	    uio->uio_td->td_tid);
 
 	/* Zero-sized reads are allowed for error checking */
 	if (uio->uio_resid != 0 && uio->uio_resid < sizeof(struct input_event))
@@ -290,19 +291,20 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 	struct input_event event;
 	int ret = 0;
 
-	debugf("uinput: write %zd bytes by thread %d", uio->uio_resid,
-	    uio->uio_td->td_tid);
-
 	ret = devfs_get_cdevpriv((void **)&state);
 	if (ret != 0)
 		return (ret);
+
+	debugf(state, "write %zd bytes by thread %d", uio->uio_resid,
+	    uio->uio_td->td_tid);
 
 	UINPUT_LOCK(state);
 
 	if (state->ucs_state != UINPUT_RUNNING) {
 		/* Process written struct uinput_user_dev */
 		if (uio->uio_resid != sizeof(struct uinput_user_dev)) {
-			debugf("write size not multiple of struct uinput_user_dev size");
+			debugf(state, "write size not multiple of "
+			    "struct uinput_user_dev size");
 			ret = EINVAL;
 		} else {
 			ret = uiomove(&userdev, sizeof(struct uinput_user_dev),
@@ -313,7 +315,8 @@ uinput_write(struct cdev *dev, struct uio *uio, int ioflag)
 	} else {
 		/* Process written event */
 		if (uio->uio_resid % sizeof(struct input_event) != 0) {
-			debugf("write size not multiple of struct input_event size");
+			debugf(state, "write size not multiple of "
+			    "struct input_event size");
 			ret = EINVAL;
 		}
 
@@ -352,7 +355,7 @@ uinput_setup_provider(struct uinput_cdev_state *state,
 	struct input_absinfo absinfo;
 	int i, ret;
 
-	debugf("uinput: setup_provider called, udev=%p", udev);
+	debugf(state, "setup_provider called, udev=%p", udev);
 
 	ret = uinput_setup_dev(state, &udev->id, udev->name,
 	    udev->ff_effects_max);
@@ -380,10 +383,10 @@ uinput_poll(struct cdev *dev, int events, struct thread *td)
 	struct uinput_cdev_state *state;
 	int revents = 0;
 
-	debugf("uinput: poll by thread %d", td->td_tid);
-
 	if (devfs_get_cdevpriv((void **)&state) != 0)
 		return (POLLNVAL);
+
+	debugf(state, "poll by thread %d", td->td_tid);
 
 	/* Always allow write */
 	if (events & (POLLOUT | POLLWRNORM))
@@ -635,11 +638,11 @@ uinput_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	struct uinput_cdev_state *state;
 	int ret;
 
-	debugf("uinput: ioctl called: cmd=0x%08lx, data=%p", cmd, data);
-
 	ret = devfs_get_cdevpriv((void **)&state);
 	if (ret != 0)
 		return (ret);
+
+	debugf(state, "ioctl called: cmd=0x%08lx, data=%p", cmd, data);
 
 	UINPUT_LOCK(state);
 	ret = uinput_ioctl_sub(state, cmd, data);
