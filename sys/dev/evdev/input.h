@@ -77,8 +77,8 @@ struct input_keymap_entry {
 #define	EVIOCGREP		_IOR(EVDEV_IOC_MAGIC, 0x03, unsigned int[2])	/* get repeat settings */
 #define	EVIOCSREP		_IOW(EVDEV_IOC_MAGIC, 0x03, unsigned int[2])	/* set repeat settings */
 
-#define	EVIOCGKEYCODE		_IOR(EVDEV_IOC_MAGIC, 0x04, unsigned int[2])	/* get keycode */
-#define	EVIOCGKEYCODE_V2	_IOR(EVDEV_IOC_MAGIC, 0x04, struct input_keymap_entry)
+#define	EVIOCGKEYCODE		_IOWR(EVDEV_IOC_MAGIC, 0x04, unsigned int[2])	/* get keycode */
+#define	EVIOCGKEYCODE_V2	_IOWR(EVDEV_IOC_MAGIC, 0x04, struct input_keymap_entry)
 #define	EVIOCSKEYCODE		_IOW(EVDEV_IOC_MAGIC, 0x04, unsigned int[2])	/* set keycode */
 #define	EVIOCSKEYCODE_V2	_IOW(EVDEV_IOC_MAGIC, 0x04, struct input_keymap_entry)
 
