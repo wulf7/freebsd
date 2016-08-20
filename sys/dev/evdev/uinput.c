@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
@@ -92,6 +93,8 @@ static struct cdevsw uinput_cdevsw = {
 	.d_kqfilter = uinput_kqfilter,
 	.d_name = "uinput",
 };
+
+static struct cdev *uinput_cdev;
 
 static struct evdev_methods uinput_ev_methods = {
 	.ev_open = NULL,
@@ -655,17 +658,52 @@ static int
 uinput_cdev_create(void)
 {
 	struct make_dev_args mda;
-	struct cdev *cdev;
+	int ret;
 
 	make_dev_args_init(&mda);
+	mda.mda_flags = MAKEDEV_WAITOK | MAKEDEV_CHECKNAME;
 	mda.mda_devsw = &uinput_cdevsw;
 	mda.mda_uid = UID_ROOT;
 	mda.mda_gid = GID_WHEEL;
 	mda.mda_mode = 0600;
 
-	make_dev_s(&mda, &cdev, "uinput");
+	ret = make_dev_s(&mda, &uinput_cdev, "uinput");
+
+	return (ret);
+}
+
+static int
+uinput_cdev_destroy(void)
+{
+
+	destroy_dev(uinput_cdev);
 
 	return (0);
 }
 
-SYSINIT(uinput, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, uinput_cdev_create, NULL);
+static int
+uinput_modevent(module_t mod __unused, int cmd, void *data)
+{
+	int ret = 0;
+
+	switch (cmd) {
+	case MOD_LOAD:
+		ret = uinput_cdev_create();
+		break;
+
+	case MOD_UNLOAD:
+		ret = uinput_cdev_destroy();
+		break;
+
+	case MOD_SHUTDOWN:
+		break;
+
+	default:
+		ret = EINVAL;
+		break;
+	}
+
+	return (ret);
+}
+
+DEV_MODULE(uinput, uinput_modevent, NULL);
