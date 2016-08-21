@@ -512,6 +512,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			return (0);
 
 		evdev_unregister(state->ucs_evdev);
+		bzero(state->ucs_evdev, sizeof(struct evdev_dev));
 		state->ucs_state = UINPUT_NEW;
 		return (0);
 
