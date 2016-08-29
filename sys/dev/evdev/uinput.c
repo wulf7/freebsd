@@ -533,7 +533,9 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			return (EINVAL);
 
 		evdev_support_abs(state->ucs_evdev, uabs->code,
-		    &uabs->absinfo);
+		    uabs->absinfo.value, uabs->absinfo.minimum,
+		    uabs->absinfo.maximum, uabs->absinfo.fuzz,
+		    uabs->absinfo.flat, uabs->absinfo.resolution);
 		return (0);
 
 	case UI_SET_EVBIT:

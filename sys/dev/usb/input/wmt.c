@@ -348,8 +348,9 @@ wmt_attach(device_t dev)
 	/* Report absolute contacts and axes information */
 	for (i = 0; i < WMT_N_USAGES; i++)
 		if (WMT_ABSINFO_IS_SET(&sc->ai[i]))
-			evdev_support_abs(sc->evdev, wmt_hid_map[i].code,
-			    (struct input_absinfo *)&sc->ai[i]);
+			evdev_support_abs(sc->evdev, wmt_hid_map[i].code, 0,
+			    sc->ai[i].minimum, sc->ai[i].maximum, 0, 0,
+			    sc->ai[i].resolution);
 
 	err = evdev_register(sc->evdev);
 	if (err)

@@ -340,13 +340,24 @@ evdev_support_rel(struct evdev_dev *evdev, uint16_t code)
 }
 
 inline void
-evdev_support_abs(struct evdev_dev *evdev, uint16_t code,
-    struct input_absinfo *absinfo)
+evdev_support_abs(struct evdev_dev *evdev, uint16_t code, int32_t value,
+    int32_t minimum, int32_t maximum, int32_t fuzz, int32_t flat,
+    int32_t resolution)
 {
+	struct input_absinfo absinfo;
 
 	KASSERT(code < ABS_CNT, ("invalid evdev abs property"));
+
+	absinfo = (struct input_absinfo) {
+		.value = value,
+		.minimum = minimum,
+		.maximum = maximum,
+		.fuzz = fuzz,
+		.flat = flat,
+		.resolution = resolution,
+	};
 	evdev_set_abs_bit(evdev, code);
-	evdev_set_absinfo(evdev, code, absinfo);
+	evdev_set_absinfo(evdev, code, &absinfo);
 }
 
 inline void

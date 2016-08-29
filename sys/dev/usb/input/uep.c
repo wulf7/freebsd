@@ -354,9 +354,6 @@ uep_attach(device_t dev)
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	struct uep_softc *sc = device_get_softc(dev);
 	int error;
-#ifdef EVDEV
-	struct input_absinfo absinfo = { 0 };
-#endif
 
 	device_set_usb_desc(dev);
 
@@ -391,14 +388,8 @@ uep_attach(device_t dev)
 	evdev_support_event(sc->evdev, EV_SYN);
 	evdev_support_event(sc->evdev, EV_ABS);
 	evdev_support_event(sc->evdev, EV_KEY);
-
-	absinfo.minimum = 0;
-	absinfo.maximum = UEP_MAX_X;
-	evdev_support_abs(sc->evdev, ABS_X, &absinfo);
-
-	absinfo.minimum = 0;
-	absinfo.maximum = UEP_MAX_Y;
-	evdev_support_abs(sc->evdev, ABS_Y, &absinfo);
+	evdev_support_abs(sc->evdev, ABS_X, 0, 0, UEP_MAX_X, 0, 0, 0);
+	evdev_support_abs(sc->evdev, ABS_Y, 0, 0, UEP_MAX_Y, 0, 0, 0);
 
 	evdev_register(sc->evdev);
 #endif

@@ -169,7 +169,6 @@ utouch_attach(device_t dev)
 {
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	struct utouch_softc *sc = device_get_softc(dev);
-	struct input_absinfo absinfo = { 0 };
 	void *d_ptr = NULL;
 	uint16_t d_len;
 	int isize, i, err;
@@ -217,12 +216,10 @@ utouch_attach(device_t dev)
 		evdev_support_key(sc->sc_evdev, BTN_MOUSE + i);
 
 	/* Report absolute axes information */
-	absinfo.minimum = 0;
-	absinfo.maximum = 0x7fff; /* XXX should read from HID descriptor */
 	if (sc->sc_flags & UTOUCH_FLAG_X_AXIS)
-		evdev_support_abs(sc->sc_evdev, ABS_X, &absinfo);
+		evdev_support_abs(sc->sc_evdev, ABS_X, 0, 0, 0x7fff, 0, 0, 0);
 	if (sc->sc_flags & UTOUCH_FLAG_Y_AXIS)
-		evdev_support_abs(sc->sc_evdev, ABS_Y, &absinfo);
+		evdev_support_abs(sc->sc_evdev, ABS_Y, 0, 0, 0x7fff, 0, 0, 0);
 
 	err = evdev_register(sc->sc_evdev);
 	if (err)
