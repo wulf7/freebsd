@@ -148,17 +148,15 @@ uinput_knlunlock(void *arg)
 static void
 uinput_knl_assert_locked(void *arg)
 {
-	struct sx *sx = arg;
 
-	sx_assert(sx, SA_XLOCKED);
+	sx_assert((struct sx*)arg, SA_XLOCKED);
 }
 
 static void
 uinput_knl_assert_unlocked(void *arg)
 {
-	struct sx *sx = arg;
 
-	sx_assert(sx, SA_UNLOCKED);
+	sx_assert((struct sx*)arg, SA_UNLOCKED);
 }
 
 static void
