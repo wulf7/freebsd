@@ -87,7 +87,7 @@ vdev_geom_set_rotation_rate(vdev_t *vd, struct g_consumer *cp)
 static void
 vdev_geom_set_physpath(struct g_consumer *cp, boolean_t do_null_update)
 {
-	boolean_t needs_update;
+	boolean_t needs_update = B_FALSE;
 	vdev_t *vd;
 	char *physpath;
 	int error, physpath_len;
@@ -777,7 +777,8 @@ vdev_geom_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 
 	if (vd->vdev_spa->spa_splitting_newspa ||
 	    (vd->vdev_prevstate == VDEV_STATE_UNKNOWN &&
-	     vd->vdev_spa->spa_load_state == SPA_LOAD_NONE)) {
+	     vd->vdev_spa->spa_load_state == SPA_LOAD_NONE ||
+	     vd->vdev_spa->spa_load_state == SPA_LOAD_CREATE)) {
 		/*
 		 * We are dealing with a vdev that hasn't been previously
 		 * opened (since boot), and we are not loading an

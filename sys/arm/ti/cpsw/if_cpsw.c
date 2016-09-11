@@ -78,6 +78,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <machine/resource.h>
 
+#include <arm/ti/ti_scm.h>
+#include <arm/ti/am335x/am335x_scm.h>
+
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
@@ -87,8 +90,6 @@ __FBSDID("$FreeBSD$");
 
 #include "if_cpswreg.h"
 #include "if_cpswvar.h"
- 
-#include <arm/ti/ti_scm.h>
 
 #include "miibus_if.h"
 
@@ -1019,14 +1020,14 @@ cpswp_attach(device_t dev)
 	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Get high part of MAC address from control module (mac_id[0|1]_hi) */
-	ti_scm_reg_read_4(0x634 + sc->unit * 8, &reg);
+	ti_scm_reg_read_4(SCM_MAC_ID0_HI + sc->unit * 8, &reg);
 	mac_addr[0] = reg & 0xFF;
 	mac_addr[1] = (reg >>  8) & 0xFF;
 	mac_addr[2] = (reg >> 16) & 0xFF;
 	mac_addr[3] = (reg >> 24) & 0xFF;
 
 	/* Get low part of MAC address from control module (mac_id[0|1]_lo) */
-	ti_scm_reg_read_4(0x630 + sc->unit * 8, &reg);
+	ti_scm_reg_read_4(SCM_MAC_ID0_LO + sc->unit * 8, &reg);
 	mac_addr[4] = reg & 0xFF;
 	mac_addr[5] = (reg >>  8) & 0xFF;
 
@@ -1874,6 +1875,7 @@ cpswp_tx_enqueue(struct cpswp_softc *sc)
 		return;
 	} else if (last_old_slot == NULL) {
 		/* Start a fresh queue. */
+		sc->swsc->last_hdp = cpsw_cpdma_bd_paddr(sc->swsc, first_new_slot);
 		cpsw_write_hdp_slot(sc->swsc, &sc->swsc->tx, first_new_slot);
 	} else {
 		/* Add buffers to end of current queue. */
@@ -1882,6 +1884,7 @@ cpswp_tx_enqueue(struct cpswp_softc *sc)
 		/* If underrun, restart queue. */
 		if (cpsw_cpdma_read_bd_flags(sc->swsc, last_old_slot) &
 		    CPDMA_BD_EOQ) {
+			sc->swsc->last_hdp = cpsw_cpdma_bd_paddr(sc->swsc, first_new_slot);
 			cpsw_write_hdp_slot(sc->swsc, &sc->swsc->tx,
 			    first_new_slot);
 		}
@@ -1897,6 +1900,7 @@ static int
 cpsw_tx_dequeue(struct cpsw_softc *sc)
 {
 	struct cpsw_slot *slot, *last_removed_slot = NULL;
+	struct cpsw_cpdma_bd bd;
 	uint32_t flags, removed = 0;
 
 	slot = STAILQ_FIRST(&sc->tx.active);
@@ -1931,12 +1935,25 @@ cpsw_tx_dequeue(struct cpsw_softc *sc)
 		}
 
 		/* TearDown complete is only marked on the SOP for the packet. */
-		if (flags & CPDMA_BD_TDOWNCMPLT) {
+		if ((flags & (CPDMA_BD_SOP | CPDMA_BD_TDOWNCMPLT)) ==
+		    (CPDMA_BD_EOP | CPDMA_BD_TDOWNCMPLT)) {
 			CPSW_DEBUGF(sc, ("TX teardown in progress"));
 			cpsw_write_cp(sc, &sc->tx, 0xfffffffc);
 			// TODO: Increment a count of dropped TX packets
 			sc->tx.running = 0;
 			break;
+		}
+
+		if ((flags & CPDMA_BD_EOP) == 0)
+			flags = cpsw_cpdma_read_bd_flags(sc, last_removed_slot);
+		if ((flags & (CPDMA_BD_EOP | CPDMA_BD_EOQ)) ==
+		    (CPDMA_BD_EOP | CPDMA_BD_EOQ)) {
+			cpsw_cpdma_read_bd(sc, last_removed_slot, &bd);
+			if (bd.next != 0 && bd.next != sc->last_hdp) {
+				/* Restart the queue. */
+				sc->last_hdp = bd.next;
+				cpsw_write_4(sc, sc->tx.hdp_offset, bd.next);
+			}
 		}
 	}
 

@@ -292,8 +292,19 @@ nd6_ifattach(struct ifnet *ifp)
 }
 
 void
-nd6_ifdetach(struct nd_ifinfo *nd)
+nd6_ifdetach(struct ifnet *ifp, struct nd_ifinfo *nd)
 {
+	struct ifaddr *ifa, *next;
+
+	IF_ADDR_RLOCK(ifp);
+	TAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, next) {
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		/* stop DAD processing */
+		nd6_dad_stop(ifa);
+	}
+	IF_ADDR_RUNLOCK(ifp);
 
 	free(nd, M_IP6NDP);
 }
@@ -2211,7 +2222,8 @@ nd6_resolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
 	}
 
 	IF_AFDATA_RLOCK(ifp);
-	ln = nd6_lookup(&dst6->sin6_addr, LLE_UNLOCKED, ifp);
+	ln = nd6_lookup(&dst6->sin6_addr, plle ? LLE_EXCLUSIVE : LLE_UNLOCKED,
+	    ifp);
 	if (ln != NULL && (ln->r_flags & RLLE_VALID) != 0) {
 		/* Entry found, let's copy lle info */
 		bcopy(ln->r_linkdata, desten, ln->r_hdrlen);
@@ -2224,9 +2236,15 @@ nd6_resolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
 			ln->lle_hittime = time_uptime;
 			LLE_REQ_UNLOCK(ln);
 		}
+		if (plle) {
+			LLE_ADDREF(ln);
+			*plle = ln;
+			LLE_WUNLOCK(ln);
+		}
 		IF_AFDATA_RUNLOCK(ifp);
 		return (0);
-	}
+	} else if (plle && ln)
+		LLE_WUNLOCK(ln);
 	IF_AFDATA_RUNLOCK(ifp);
 
 	return (nd6_resolve_slow(ifp, 0, m, dst6, desten, pflags, plle));

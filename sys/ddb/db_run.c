@@ -90,13 +90,14 @@ db_pc_is_singlestep(db_addr_t pc)
 #endif
 
 bool
-db_stop_at_pc(bool *is_breakpoint)
+db_stop_at_pc(int type, int code, bool *is_breakpoint, bool *is_watchpoint)
 {
 	db_addr_t	pc;
 	db_breakpoint_t bkpt;
 
+	*is_breakpoint = IS_BREAKPOINT_TRAP(type, code);
+	*is_watchpoint = IS_WATCHPOINT_TRAP(type, code);
 	pc = PC_REGS();
-
 	if (db_pc_is_singlestep(pc))
 		*is_breakpoint = false;
 
@@ -125,6 +126,7 @@ db_stop_at_pc(bool *is_breakpoint)
 		*is_breakpoint = true;
 		return (true);	/* stop here */
 	    }
+	    return (false);	/* continue the countdown */
 	} else if (*is_breakpoint) {
 #ifdef BKPT_SKIP
 		BKPT_SKIP;
@@ -145,7 +147,6 @@ db_stop_at_pc(bool *is_breakpoint)
 		if (db_sstep_print) {
 		    db_printf("\t\t");
 		    db_print_loc_and_inst(pc);
-		    db_printf("\n");
 		}
 		return (false);	/* continue */
 	    }
@@ -165,7 +166,6 @@ db_stop_at_pc(bool *is_breakpoint)
 			for (i = db_call_depth; --i > 0; )
 			    db_printf("  ");
 			db_print_loc_and_inst(pc);
-			db_printf("\n");
 		    }
 		}
 		if (inst_call(ins))

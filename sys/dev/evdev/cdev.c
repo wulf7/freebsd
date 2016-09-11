@@ -120,11 +120,18 @@ evdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 		ret = ENODEV;
 	else
 		ret = evdev_register_client(evdev, client);
+
 	if (ret != 0)
 		evdev_revoke_client(client);
-	else
-		ret = devfs_set_cdevpriv(client, evdev_dtor);
+	/*
+	 * Unlock evdev here because non-sleepable lock held 
+	 * while calling devfs_set_cdevpriv upsets WITNESS
+	 */
 	EVDEV_UNLOCK(evdev);
+
+	if (!ret)
+		ret = devfs_set_cdevpriv(client, evdev_dtor);
+
 	if (ret != 0) {
 		debugf(client, "cannot register evdev client");
 		evdev_dtor(client);

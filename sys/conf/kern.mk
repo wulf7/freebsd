@@ -17,13 +17,13 @@ CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 # kernel where fixing them is more trouble than it is worth, or where there is
 # a false positive.
 .if ${COMPILER_TYPE} == "clang"
-NO_WCONSTANT_CONVERSION=	-Wno-constant-conversion
-NO_WSHIFT_COUNT_NEGATIVE=	-Wno-shift-count-negative
-NO_WSHIFT_COUNT_OVERFLOW=	-Wno-shift-count-overflow
-NO_WSELF_ASSIGN=		-Wno-self-assign
-NO_WUNNEEDED_INTERNAL_DECL=	-Wno-unneeded-internal-declaration
+NO_WCONSTANT_CONVERSION=	-Wno-error-constant-conversion
+NO_WSHIFT_COUNT_NEGATIVE=	-Wno-error-shift-count-negative
+NO_WSHIFT_COUNT_OVERFLOW=	-Wno-error-shift-count-overflow
+NO_WSELF_ASSIGN=		-Wno-error-self-assign
+NO_WUNNEEDED_INTERNAL_DECL=	-Wno-error-unneeded-internal-declaration
 NO_WSOMETIMES_UNINITIALIZED=	-Wno-error-sometimes-uninitialized
-NO_WCAST_QUAL=			-Wno-cast-qual
+NO_WCAST_QUAL=			-Wno-error-cast-qual
 # Several other warnings which might be useful in some cases, but not severe
 # enough to error out the whole kernel build.  Display them anyway, so there is
 # some incentive to fix them eventually.
@@ -45,11 +45,24 @@ CLANG_NO_IAS34= -no-integrated-as
 .if ${COMPILER_VERSION} >= 40800
 # Catch-all for all the things that are in our tree, but for which we're
 # not yet ready for this compiler.
-CWARNEXTRA?=	-Wno-error=inline -Wno-error=enum-compare -Wno-error=unused-but-set-variable \
-		-Wno-error=aggressive-loop-optimizations -Wno-error=maybe-uninitialized \
-		-Wno-error=array-bounds -Wno-error=address \
-		-Wno-error=cast-qual -Wno-error=sequence-point -Wno-error=attributes \
-		-Wno-error=strict-overflow -Wno-error=overflow
+CWARNEXTRA?=	-Wno-error=address				\
+		-Wno-error=aggressive-loop-optimizations	\
+		-Wno-error=array-bounds				\
+		-Wno-error=attributes				\
+		-Wno-error=cast-qual				\
+		-Wno-error=enum-compare				\
+		-Wno-error=inline				\
+		-Wno-error=maybe-uninitialized			\
+		-Wno-error=overflow				\
+		-Wno-error=sequence-point			\
+		-Wno-error=strict-overflow			\
+		-Wno-error=unused-but-set-variable
+.if ${COMPILER_VERSION} >= 60100
+CWARNEXTRA+=	-Wno-error=misleading-indentation		\
+		-Wno-error=nonnull-compare			\
+		-Wno-error=shift-overflow			\
+		-Wno-error=tautological-compare
+.endif
 .else
 # For gcc 4.2, eliminate the too-often-wrong warnings about uninitialized vars.
 CWARNEXTRA?=	-Wno-uninitialized
@@ -201,7 +214,7 @@ CFLAGS+=	-fstack-protector
 CFLAGS+=	-gdwarf-2
 .endif
 
-CFLAGS+= ${CWARNFLAGS} ${CWARNFLAGS.${.IMPSRC:T}}
+CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}
 CFLAGS+= ${CFLAGS.${COMPILER_TYPE}} ${CFLAGS.${.IMPSRC:T}}
 
 # Tell bmake not to mistake standard targets for things to be searched for

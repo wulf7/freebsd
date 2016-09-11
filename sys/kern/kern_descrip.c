@@ -517,28 +517,26 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		break;
 
 	case F_GETFD:
+		error = EBADF;
 		FILEDESC_SLOCK(fdp);
-		if (fget_locked(fdp, fd) == NULL) {
-			FILEDESC_SUNLOCK(fdp);
-			error = EBADF;
-			break;
+		fde = fdeget_locked(fdp, fd);
+		if (fde != NULL) {
+			td->td_retval[0] =
+			    (fde->fde_flags & UF_EXCLOSE) ? FD_CLOEXEC : 0;
+			error = 0;
 		}
-		fde = &fdp->fd_ofiles[fd];
-		td->td_retval[0] =
-		    (fde->fde_flags & UF_EXCLOSE) ? FD_CLOEXEC : 0;
 		FILEDESC_SUNLOCK(fdp);
 		break;
 
 	case F_SETFD:
+		error = EBADF;
 		FILEDESC_XLOCK(fdp);
-		if (fget_locked(fdp, fd) == NULL) {
-			FILEDESC_XUNLOCK(fdp);
-			error = EBADF;
-			break;
+		fde = fdeget_locked(fdp, fd);
+		if (fde != NULL) {
+			fde->fde_flags = (fde->fde_flags & ~UF_EXCLOSE) |
+			    (arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
+			error = 0;
 		}
-		fde = &fdp->fd_ofiles[fd];
-		fde->fde_flags = (fde->fde_flags & ~UF_EXCLOSE) |
-		    (arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
 		FILEDESC_XUNLOCK(fdp);
 		break;
 
@@ -820,6 +818,9 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	MPASS((flags & ~(FDDUP_FLAG_CLOEXEC)) == 0);
 	MPASS(mode < FDDUP_LASTMODE);
 
+	AUDIT_ARG_FD(old);
+	/* XXXRW: if (flags & FDDUP_FIXED) AUDIT_ARG_FD2(new); */
+
 	/*
 	 * Verify we have a valid descriptor to dup from and possibly to
 	 * dup to. Unlike dup() and dup2(), fcntl()'s F_DUPFD should
@@ -939,6 +940,8 @@ funsetown(struct sigio **sigiop)
 {
 	struct sigio *sigio;
 
+	if (*sigiop == NULL)
+		return;
 	SIGIO_LOCK();
 	sigio = *sigiop;
 	if (sigio == NULL) {
@@ -3175,7 +3178,7 @@ sysctl_kern_proc_nfds(SYSCTL_HANDLER_ARGS)
 }
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_NFDS, nfds,
-    CTLFLAG_RD|CTLFLAG_MPSAFE, sysctl_kern_proc_nfds,
+    CTLFLAG_RD|CTLFLAG_CAPRD|CTLFLAG_MPSAFE, sysctl_kern_proc_nfds,
     "Number of open file descriptors");
 
 /*

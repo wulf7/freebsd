@@ -471,7 +471,7 @@ vm_object_vndeallocate(vm_object_t object)
 	KASSERT(vp != NULL, ("vm_object_vndeallocate: missing vp"));
 #ifdef INVARIANTS
 	if (object->ref_count == 0) {
-		vprint("vm_object_vndeallocate", vp);
+		vn_printf(vp, "vm_object_vndeallocate ");
 		panic("vm_object_vndeallocate: bad object reference count");
 	}
 #endif
@@ -740,6 +740,10 @@ vm_object_terminate(vm_object_t object)
 		VM_OBJECT_WUNLOCK(object);
 
 		vinvalbuf(vp, V_SAVE, 0, 0);
+
+		BO_LOCK(&vp->v_bufobj);
+		vp->v_bufobj.bo_flag |= BO_DEAD;
+		BO_UNLOCK(&vp->v_bufobj);
 
 		VM_OBJECT_WLOCK(object);
 	}

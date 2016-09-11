@@ -160,27 +160,46 @@ aw_modclk_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
     int flags, int *stop)
 {
 	struct aw_modclk_sc *sc;
-	uint32_t val, m, n, best_m, best_n;
+	uint32_t val, m, n, src, best_m, best_n, best_src;
 	uint64_t cur_freq;
 	int64_t best_diff, cur_diff;
+	int error;
 
 	sc = clknode_get_softc(clk);
 	best_n = best_m = 0;
 	best_diff = (int64_t)*fout; 
+	best_src = 0;
 
-	for (n = 0; n <= CLK_RATIO_N_MAX; n++)
-		for (m = 0; m <= CLK_RATIO_M_MAX; m++) {
-			cur_freq = fin / (1 << n) / (m + 1);
-			cur_diff = (int64_t)*fout - cur_freq;
-			if (cur_diff >= 0 && cur_diff < best_diff) {
-				best_diff = cur_diff;
-				best_m = m;
-				best_n = n;
+	for (src = 0; src < CLK_SRC_SEL_MAX; src++) {
+		error = clknode_set_parent_by_idx(clk, src);
+		if (error != 0)
+			continue;
+		error = clknode_get_freq(clknode_get_parent(clk), &fin);
+		if (error != 0)
+			continue;
+
+		for (n = 0; n <= CLK_RATIO_N_MAX; n++)
+			for (m = 0; m <= CLK_RATIO_M_MAX; m++) {
+				cur_freq = fin / (1 << n) / (m + 1);
+				cur_diff = (int64_t)*fout - cur_freq;
+				if (cur_diff >= 0 && cur_diff < best_diff) {
+					best_src = src;
+					best_diff = cur_diff;
+					best_m = m;
+					best_n = n;
+				}
 			}
-		}
+	}
 
 	if (best_diff == (int64_t)*fout)
 		return (ERANGE);
+
+	error = clknode_set_parent_by_idx(clk, best_src);
+	if (error != 0)
+		return (error);
+	error = clknode_get_freq(clknode_get_parent(clk), &fin);
+	if (error != 0)
+		return (error);
 
 	DEVICE_LOCK(sc);
 	MODCLK_READ(sc, &val);
@@ -260,7 +279,7 @@ aw_modclk_attach(device_t dev)
 	def.id = 1;
 	def.parent_names = malloc(sizeof(char *) * ncells, M_OFWPROP, M_WAITOK);
 	for (i = 0; i < ncells; i++) {
-		error = clk_get_by_ofw_index(dev, i, &clk_parent);
+		error = clk_get_by_ofw_index(dev, 0, i, &clk_parent);
 		if (error != 0) {
 			device_printf(dev, "cannot get clock %d\n", i);
 			goto fail;
