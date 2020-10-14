@@ -95,7 +95,8 @@ EVDEV=		input.h \
 EVDEVDIR=	${INCLUDEDIR}/dev/evdev
 
 .PATH: ${SRCTOP}/sys/dev/hid
-HID=		hid.h
+HID=		hid.h \
+		hidraw.h
 HIDDIR=		${INCLUDEDIR}/dev/hid
 
 .PATH: ${SRCTOP}/sys/dev/hyperv/include ${SRCTOP}/sys/dev/hyperv/utilities
@@ -352,7 +353,7 @@ symlinks: .PHONY .META
 		    ${SDESTDIR}${INCLUDEDIR}/dev/evdev; \
 	done
 	cd ${SRCTOP}/sys/dev/hid; \
-	for h in hid.h; do \
+	for h in hid.h hidraw.h; do \
 		ln -fs ../../../../sys/dev/hid/$$h \
 		    ${SDESTDIR}${INCLUDEDIR}/dev/hid; \
 	done
