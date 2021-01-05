@@ -88,6 +88,8 @@ extern int evdev_sysmouse_t_axis;
 					 * for MT protocol type B reports */
 #define	EVDEV_FLAG_MT_AUTOREL	0x02	/* Autorelease MT-slots not listed in
 					 * current MT protocol type B report */
+#define	EVDEV_FLAG_EXT_EPOCH	0x03	/* evdev_push_* is allways called with
+					 * input (global) epoch entered */
 #define	EVDEV_FLAG_MAX		0x1F
 #define	EVDEV_FLAG_CNT		(EVDEV_FLAG_MAX + 1)
 
@@ -111,7 +113,6 @@ void evdev_set_methods(struct evdev_dev *, void *,
     const struct evdev_methods *);
 int evdev_register(struct evdev_dev *);
 int evdev_register_mtx(struct evdev_dev *, struct mtx *);
-int evdev_register_epoch(struct evdev_dev *, epoch_t);
 int evdev_unregister(struct evdev_dev *);
 int evdev_push_event(struct evdev_dev *, uint16_t, uint16_t, int32_t);
 void evdev_support_prop(struct evdev_dev *, uint16_t);

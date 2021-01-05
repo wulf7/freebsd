@@ -91,18 +91,20 @@ enum evdev_clock_id
  *
  * Depending on evdev_register_() suffix evdev can run in following modes:
  * 1. Internal epoch. evdev_register(). All locks are internal.
- * 2. External epoch. evdev_register_epoch(). Evdev expects to be run under
- *    epoch entered by parent driver.
+ * 2. External epoch. Evdev expects to be run under input epoch entered by
+ *    parent driver. The mode is enabled with EVDEV_FLAG_EXT_EPOCH flag.
  * 3. External mutex. evdev_register_mtx(). Evdev uses mutex provided by parent
  *    driver as both "State lock" and "Client list lock". This mode is
  *    deprecated as it causes ev_open and ev_close handlers to be called with
  *    parent driver mutex taken.
  */
+#define	INPUT_EPOCH	global_epoch_preempt
+
 enum evdev_lock_type
 {
 	EV_LOCK_INTERNAL = 0,	/* Internal epoch */
 	EV_LOCK_MTX,		/* Driver`s mutex */
-	EV_LOCK_EPOCH,		/* External epoch */
+	EV_LOCK_EXT_EPOCH,	/* External epoch */
 };
 
 struct evdev_dev
@@ -115,7 +117,6 @@ struct evdev_dev
 	enum evdev_lock_type	ev_lock_type;
 	struct mtx *		ev_state_lock;	/* State lock */
 	struct mtx		ev_mtx;		/* Internal state lock */
-	epoch_t			ev_epoch;	/* Client list epoch */
 	struct sx		ev_list_lock;	/* Client list lock */
 	struct input_id		ev_id;
 	struct evdev_client *	ev_grabber;			/* (s) */

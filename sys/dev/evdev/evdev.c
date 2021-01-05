@@ -347,10 +347,12 @@ evdev_register(struct evdev_dev *evdev)
 {
 	int ret;
 
-	evdev->ev_lock_type = EV_LOCK_INTERNAL;
+	if (bit_test(evdev->ev_flags, EVDEV_FLAG_EXT_EPOCH))
+		evdev->ev_lock_type = EV_LOCK_EXT_EPOCH;
+	else
+		evdev->ev_lock_type = EV_LOCK_INTERNAL;
 	evdev->ev_state_lock = &evdev->ev_mtx;
 	mtx_init(&evdev->ev_mtx, "evmtx", NULL, MTX_DEF);
-	evdev->ev_epoch = global_epoch_preempt;
 
 	ret = evdev_register_common(evdev);
 	if (ret != 0)
@@ -366,23 +368,6 @@ evdev_register_mtx(struct evdev_dev *evdev, struct mtx *mtx)
 	evdev->ev_lock_type = EV_LOCK_MTX;
 	evdev->ev_state_lock = mtx;
 	return (evdev_register_common(evdev));
-}
-
-int
-evdev_register_epoch(struct evdev_dev *evdev, epoch_t epoch)
-{
-	int ret;
-
-	evdev->ev_lock_type = EV_LOCK_EPOCH;
-	evdev->ev_state_lock = &evdev->ev_mtx;
-	mtx_init(&evdev->ev_mtx, "evmtx", NULL, MTX_DEF);
-	evdev->ev_epoch = epoch;
-
-	ret = evdev_register_common(evdev);
-	if (ret != 0)
-		mtx_destroy(&evdev->ev_mtx);
-
-	return (ret);
 }
 
 int
@@ -852,8 +837,13 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 	EVDEV_LOCK_ASSERT(evdev);
 
 	/* Propagate event through all clients */
-	if (evdev->ev_lock_type == EV_LOCK_EPOCH)
-		epoch_enter_preempt(evdev->ev_epoch, &et);
+	if (evdev->ev_lock_type == EV_LOCK_INTERNAL)
+		epoch_enter_preempt(INPUT_EPOCH, &et);
+
+	KASSERT(
+	    evdev->ev_lock_type == EV_LOCK_MTX || in_epoch(INPUT_EPOCH) != 0,
+	    ("Input epoch has not been entered\n"));
+
 	CK_SLIST_FOREACH(client, &evdev->ev_clients, ec_link) {
 		if (evdev->ev_grabber != NULL && evdev->ev_grabber != client)
 			continue;
@@ -864,8 +854,8 @@ evdev_propagate_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 			evdev_notify_event(client);
 		EVDEV_CLIENT_UNLOCKQ(client);
 	}
-	if (evdev->ev_lock_type == EV_LOCK_EPOCH)
-		epoch_exit_preempt(evdev->ev_epoch, &et);
+	if (evdev->ev_lock_type == EV_LOCK_INTERNAL)
+		epoch_exit_preempt(INPUT_EPOCH, &et);
 
 	evdev->ev_event_count++;
 }
@@ -963,6 +953,7 @@ int
 evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
     int32_t value)
 {
+	struct epoch_tracker et;
 	int ret = 0;
 
 	switch (type) {
@@ -995,9 +986,14 @@ evdev_inject_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
 push:
 		if (evdev->ev_lock_type == EV_LOCK_MTX)
 			EVDEV_LOCK(evdev);
+		else if (evdev->ev_lock_type == EV_LOCK_EXT_EPOCH)
+			epoch_enter_preempt(INPUT_EPOCH, &et);
 		ret = evdev_push_event(evdev, type,  code, value);
 		if (evdev->ev_lock_type == EV_LOCK_MTX)
 			EVDEV_UNLOCK(evdev);
+		else if (evdev->ev_lock_type == EV_LOCK_EXT_EPOCH)
+			epoch_exit_preempt(INPUT_EPOCH, &et);
+
 		break;
 
 	default:
@@ -1086,10 +1082,15 @@ evdev_release_client(struct evdev_dev *evdev, struct evdev_client *client)
 static void
 evdev_repeat_callout(void *arg)
 {
+	struct epoch_tracker et;
 	struct evdev_dev *evdev = (struct evdev_dev *)arg;
 
+	if (evdev->ev_lock_type == EV_LOCK_EXT_EPOCH)
+		epoch_enter_preempt(INPUT_EPOCH, &et);
 	evdev_send_event(evdev, EV_KEY, evdev->ev_rep_key, KEY_EVENT_REPEAT);
 	evdev_send_event(evdev, EV_SYN, SYN_REPORT, 1);
+	if (evdev->ev_lock_type == EV_LOCK_EXT_EPOCH)
+		epoch_exit_preempt(INPUT_EPOCH, &et);
 
 	if (evdev->ev_rep[REP_PERIOD])
 		callout_reset(&evdev->ev_rep_callout,

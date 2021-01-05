@@ -159,7 +159,7 @@ evdev_dtor(void *data)
 	EVDEV_LIST_UNLOCK(client->ec_evdev);
 
 	if (client->ec_evdev->ev_lock_type != EV_LOCK_MTX)
-		epoch_wait_preempt(client->ec_evdev->ev_epoch);
+		epoch_wait_preempt(INPUT_EPOCH);
 	knlist_clear(&client->ec_selp.si_note, 0);
 	seldrain(&client->ec_selp);
 	knlist_destroy(&client->ec_selp.si_note);
