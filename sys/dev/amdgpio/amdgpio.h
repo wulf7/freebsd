@@ -41,6 +41,13 @@
 #define	AMD_GPIO_PINS_PER_BANK		64
 #define	AMD_GPIO_PINS_MAX		256 /* 4 banks * 64 pins */
 
+#define	AMD_GPIO_PINS_PER_INTR_BIT	4
+#define	AMD_GPIO_NUM_INTR_BITS	46
+#define	AMD_GPIO_RESERVED_INTR_BIT	15 /* pins 60 - 63 */
+#define	AMD_GPIO_INTR_MASK		\
+    ((((uint64_t)1 << AMD_GPIO_NUM_INTR_BITS) - 1) & \
+	~(1u << AMD_GPIO_RESERVED_INTR_BIT))
+
 /* Number of pins in each bank */
 #define	AMD_GPIO_PINS_BANK0		63
 #define	AMD_GPIO_PINS_BANK1		64
@@ -50,15 +57,18 @@
 					AMD_GPIO_PINS_BANK1 + \
 					AMD_GPIO_PINS_BANK2 + \
 					AMD_GPIO_PINS_BANK3)
-#define	AMDGPIO_DEFAULT_CAPS		(GPIO_PIN_INPUT | GPIO_PIN_OUTPUT)
+#define	AMDGPIO_DEFAULT_CAPS		\
+    (GPIO_PIN_INPUT | GPIO_PIN_OUTPUT | GPIO_PIN_PULLUP | GPIO_PIN_PULLDOWN)
+#define	AMDGPIO_INTR_CAPS		GPIO_INTR_MASK
 
 /* Register related macros */
 #define	AMDGPIO_PIN_REGISTER(pin)	(pin * 4)
 
 #define	WAKE_INT_MASTER_REG		0xfc
 #define	EOI_MASK			(1 << 29)
-#define	WAKE_INT_STATUS_REG0		0x2f8
-#define	WAKE_INT_STATUS_REG1		0x2fc
+#define	INTR_EN_MASK			(1 << 30)
+#define	INT_STATUS_REG0			0x2f8
+#define	INT_STATUS_REG1			0x2fc
 
 /* Bit definition of 32 bits of each pin register */
 #define	DB_TMR_OUT_OFF			0
@@ -300,7 +310,7 @@ static const struct amd_pingroup kernzp_groups[] = {
 /* Macros for driver mutex locking */
 #define	AMDGPIO_LOCK_INIT(_sc)	\
 	mtx_init(&_sc->sc_mtx, device_get_nameunit((_sc)->sc_dev),	\
-		"amdgpio", MTX_SPIN)
+		"amdgpio", MTX_SPIN | MTX_RECURSE)
 #define	AMDGPIO_LOCK_DESTROY(_sc)	mtx_destroy(&(_sc)->sc_mtx)
 #define	AMDGPIO_LOCK(_sc)		mtx_lock_spin(&(_sc)->sc_mtx)
 #define	AMDGPIO_UNLOCK(_sc)		mtx_unlock_spin(&(_sc)->sc_mtx)
@@ -319,6 +329,10 @@ struct amdgpio_softc {
 	struct resource		*sc_res[AMD_GPIO_NUM_PIN_BANK + 1];
 	bus_space_tag_t		sc_bst;
 	bus_space_handle_t	sc_bsh;
+	int			sc_intr_en_count;
+	int			sc_intr_rid;
+	struct resource		*sc_intr_res;
+	void			*sc_intr_handle;
 	struct gpio_pin		sc_gpio_pins[AMD_GPIO_PINS_MAX];
 	const struct pin_info	*sc_pin_info;
 	const struct amd_pingroup *sc_groups;
