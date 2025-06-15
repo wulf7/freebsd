@@ -82,10 +82,13 @@ struct intr_map_data_gpio {
 };
 #endif
 
+struct gpiopic;
+
 struct gpiobus_softc
 {
 	struct mtx	sc_mtx;		/* bus mutex */
 	struct rman	sc_intr_rman;	/* isr resources */
+	struct gpiopic	*sc_pic;	/* interrupt controller logic */
 	device_t	sc_busdev;	/* bus device */
 	device_t	sc_owner;	/* bus owner */
 	device_t	sc_dev;		/* driver device */
@@ -176,6 +179,7 @@ device_t gpiobus_attach_bus(device_t);
 int gpiobus_detach_bus(device_t);
 int gpiobus_attach(device_t);
 int gpiobus_detach(device_t);
+void gpiobus_handle_intr(device_t, uint32_t);
 int gpiobus_init_softc(device_t);
 int gpiobus_alloc_ivars(struct gpiobus_ivar *);
 void gpiobus_free_ivars(struct gpiobus_ivar *);
